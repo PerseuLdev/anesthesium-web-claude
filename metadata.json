@@ -1,0 +1,7 @@
+{
+  "name": "Anesthesium",
+  "description": "App de apoio clínico para anestesiologistas com gasometria, calculadora de drogas, escores e calculadoras gerais.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
