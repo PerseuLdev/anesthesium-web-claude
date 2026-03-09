@@ -1,3 +1,71 @@
+export interface ProtocoloSedacao {
+  id: string;
+  nome: string;
+  contexto: 'Centro Cirúrgico' | 'UTI' | 'Procedimento' | 'Emergência';
+  descricao: string;
+  drogas: string[];
+  cor: 'amber' | 'cyan' | 'rose' | 'emerald' | 'indigo' | 'purple' | 'orange';
+}
+
+export const PROTOCOLOS_SEDACAO: ProtocoloSedacao[] = [
+  {
+    id: 'tiva',
+    nome: 'TIVA',
+    contexto: 'Centro Cirúrgico',
+    descricao: 'Anestesia Total IV — Propofol + Remifentanil + BNM',
+    drogas: ['Propofol', 'Remifentanil', 'Rocurônio'],
+    cor: 'amber',
+  },
+  {
+    id: 'inducao-balanceada',
+    nome: 'Indução Balanceada',
+    contexto: 'Centro Cirúrgico',
+    descricao: 'Técnica padrão — Propofol + Fentanil + Rocurônio',
+    drogas: ['Propofol', 'Fentanil', 'Rocurônio'],
+    cor: 'cyan',
+  },
+  {
+    id: 'rsi',
+    nome: 'RSI',
+    contexto: 'Emergência',
+    descricao: 'Sequência Rápida de Intubação — Ketamina + Succinilcolina',
+    drogas: ['Ketamina', 'Succinilcolina'],
+    cor: 'rose',
+  },
+  {
+    id: 'hemo-instavel',
+    nome: 'Instab. Hemodinâmica',
+    contexto: 'Emergência',
+    descricao: 'Paciente instável — Etomidato + Fentanil + Rocurônio',
+    drogas: ['Etomidato', 'Fentanil', 'Rocurônio'],
+    cor: 'orange',
+  },
+  {
+    id: 'sedacao-consciente',
+    nome: 'Sedação Consciente',
+    contexto: 'Procedimento',
+    descricao: 'Mantém reflexos e cooperação — Midazolam + Fentanil',
+    drogas: ['Midazolam', 'Fentanil'],
+    cor: 'emerald',
+  },
+  {
+    id: 'uti-leve',
+    nome: 'Sedação UTI',
+    contexto: 'UTI',
+    descricao: 'RASS -2 a 0 — Propofol + Fentanil',
+    drogas: ['Propofol', 'Fentanil'],
+    cor: 'indigo',
+  },
+  {
+    id: 'uti-profunda',
+    nome: 'Sedação Profunda',
+    contexto: 'UTI',
+    descricao: 'RASS -3 a -5 — Propofol + Fentanil + Dexmedetomidina',
+    drogas: ['Propofol', 'Fentanil', 'Dexmedetomidina'],
+    cor: 'purple',
+  },
+];
+
 export interface Droga {
   nome: string;
   classe: string;

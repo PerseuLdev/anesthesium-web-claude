@@ -260,6 +260,55 @@ Responda em Markdown, de forma direta e prática, focado em anestesiologia.${pac
   }
 }
 
+// ── Sugestão de Protocolo de Sedação ─────────────────────────
+export async function sugerirProtocoloSedacao(
+  cenario: string,
+  paciente?: PacienteAIContext
+): Promise<string> {
+  const ctxPaciente = paciente ? `
+DADOS DO PACIENTE:
+${[
+    paciente.peso   != null ? `• Peso: ${paciente.peso} kg` : '',
+    paciente.altura != null ? `• Altura: ${paciente.altura} cm` : '',
+    paciente.idade  != null ? `• Idade: ${paciente.idade} anos` : '',
+    paciente.sexo   != null ? `• Sexo: ${paciente.sexo === 'M' ? 'Masculino' : 'Feminino'}` : '',
+    paciente.gasometria ? `• Gasometria: pH ${paciente.gasometria.pH} | PaCO2 ${paciente.gasometria.PaCO2} mmHg | Lactato ${paciente.gasometria.Lactato} mmol/L` : '',
+  ].filter(Boolean).join('\n')}
+` : '\nDADOS DO PACIENTE: Não informados. Use referências para adulto padrão (70 kg).';
+
+  const prompt = `Você é um Anestesiologista Sênior especialista em farmacologia anestésica.
+
+CENÁRIO CLÍNICO: ${cenario}
+${ctxPaciente}
+TAREFA: Sugira um protocolo de sedação/anestesia personalizado para este cenário e paciente.
+
+INSTRUÇÕES DE SAÍDA (Markdown, direto, máximo 350 palavras):
+
+## Protocolo Sugerido
+Nome do protocolo e justificativa breve.
+
+## Drogas e Doses
+Para cada droga, forneça:
+- **Nome:** dose absoluta calculada para o peso (se informado) OU dose/kg
+- Velocidade de infusão em mL/h quando aplicável
+- Concentração de preparo padrão
+
+## Alertas Específicos
+Alertas e cuidados para este paciente/cenário específico.
+
+## Ajustes Necessários
+Quaisquer ajustes de dose por idade, hemodinâmica, ou comorbidades inferíveis do contexto.
+
+Seja clínico, preciso e praticamente útil. Inclua apenas drogas relevantes para o cenário.`;
+
+  try {
+    return await callAI(prompt, 'gemini-3.1-pro-preview');
+  } catch (error) {
+    console.error('Erro ao sugerir protocolo de sedação:', error);
+    throw new Error('Falha ao comunicar com a IA para sugestão de protocolo.');
+  }
+}
+
 // ── Interações Medicamentosas ────────────────────────────────
 export async function checkDrugInteractions(drugs: Droga[]): Promise<string> {
   if (drugs.length < 2) return 'Adicione pelo menos 2 medicamentos para verificar interações.';
