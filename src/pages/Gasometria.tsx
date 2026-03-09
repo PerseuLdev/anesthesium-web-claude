@@ -13,6 +13,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { interpretarGasometria, GasometriaInput, GasometriaOutput } from '../lib/clinical/gasometria';
 import { useHistoryStore } from '../lib/storage/historyStore';
 import { useDraftStore } from '../lib/storage/draftStore';
+import { useSessionStore } from '../lib/storage/sessionStore';
 import { extractGasometriaFromImage } from '../lib/services/ocrService';
 import { generateClinicalPlan } from '../lib/services/clinicalAiService';
 import { CameraScanner } from '../components/CameraScanner';
@@ -66,6 +67,7 @@ export function Gasometria() {
   const [currentAvaliacaoId, setCurrentAvaliacaoId] = useState<string | null>(null);
   const addAvaliacao = useHistoryStore(state => state.addAvaliacao);
   const updateAvaliacao = useHistoryStore(state => state.updateAvaliacao);
+  const setGasometriaSnapshot = useSessionStore(s => s.setGasometriaSnapshot);
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<GasometriaInput>({
     resolver: zodResolver(schema),
@@ -111,6 +113,20 @@ export function Gasometria() {
     setResultado(res);
     setAiSuggestion(null); // Reset AI suggestion on new calculation
     setCopied(false);
+
+    // Propagar campos sobrepostos para o módulo Hemodinâmica
+    const kpa = data.unidadePressao === 'kPa';
+    setGasometriaSnapshot({
+      pH:       data.pH,
+      PaCO2:    kpa ? data.PaCO2 * 7.50062 : data.PaCO2,
+      HCO3:     data.HCO3,
+      PaO2:     data.PaO2 != null ? (kpa ? data.PaO2 * 7.50062 : data.PaO2) : undefined,
+      Lactato:  data.Lactato,
+      Na:       data.Na,
+      Cl:       data.Cl,
+      Albumina: data.Albumina,
+      capturedAt: new Date().toISOString(),
+    });
 
     // Auto-save
     const id = addAvaliacao({
