@@ -15,7 +15,8 @@
     "calculators": "Calculadoras",
     "logout": "Sair",
     "login": "Entrar",
-    "register": "Registrar"
+    "register": "Registrar",
+    "surgeries": "Cirurgias"
   },
   "gasometry": {
     "title": "Gasometria Arterial",

@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { Activity, Pill, ClipboardList, Calculator, History, LogOut, ArrowUp, Heart } from 'lucide-react';
+import { Activity, Pill, ClipboardList, Calculator, History, LogOut, ArrowUp, Heart, Scissors } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -10,6 +10,7 @@ export function Layout() {
   const [showBackToTop, setShowBackToTop] = useState(false);
 
   const navItems = [
+    { to: '/cirurgias', icon: Scissors, label: 'Cirurgias' },
     { to: '/', icon: Activity, label: t('common.gasometry') },
     { to: '/hemodinamica', icon: Heart, label: 'Hemo' },
     { to: '/drogas', icon: Pill, label: t('common.drugs') },
@@ -73,13 +74,13 @@ export function Layout() {
 
       {/* Floating Bottom Navigation */}
       <div className="fixed bottom-6 left-0 right-0 flex justify-center pointer-events-none z-50 px-4">
-        <nav className="flex items-center gap-1 p-1.5 glass-panel rounded-full pointer-events-auto shadow-2xl shadow-black/50">
+        <nav className="flex items-center gap-1 p-1.5 glass-panel rounded-full pointer-events-auto shadow-2xl shadow-black/50 overflow-x-auto scrollbar-none max-w-[calc(100vw-2rem)]">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `relative flex items-center justify-center w-12 h-12 rounded-full transition-all duration-300 ${
+                `relative flex items-center justify-center w-12 h-12 min-w-[3rem] rounded-full transition-all duration-300 ${
                   isActive
                     ? 'text-black'
                     : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'

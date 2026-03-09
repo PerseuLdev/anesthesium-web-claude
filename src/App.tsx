@@ -12,6 +12,7 @@ import { Escores } from './pages/Escores';
 import { Calculadoras } from './pages/Calculadoras';
 import { Historico } from './pages/Historico';
 import { Hemodinamica } from './pages/Hemodinamica';
+import { Cirurgias } from './pages/Cirurgias';
 import './lib/i18n'; // Initialize i18n
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="calculadoras" element={<Calculadoras />} />
           <Route path="historico" element={<Historico />} />
           <Route path="hemodinamica" element={<Hemodinamica />} />
+          <Route path="cirurgias" element={<Cirurgias />} />
         </Route>
       </Routes>
     </BrowserRouter>
