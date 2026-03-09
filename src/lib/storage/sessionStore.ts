@@ -12,12 +12,27 @@ export interface GasometriaSnapshot {
   capturedAt: string; // ISO 8601
 }
 
+export interface PacienteContext {
+  peso?: number;
+  altura?: number;
+  idade?: number;
+  sexo?: 'M' | 'F';
+  capturedAt: string; // ISO 8601
+}
+
 interface SessionState {
+  // Gasometria → Hemodinâmica
   gasometriaSnapshot: GasometriaSnapshot | null;
   bannerDismissed: boolean;
   setGasometriaSnapshot: (snapshot: GasometriaSnapshot) => void;
   dismissBanner: () => void;
   clearSnapshot: () => void;
+
+  // Hemodinâmica → Drogas / Cirurgias AI
+  pacienteContext: PacienteContext | null;
+  pacienteBannerDismissed: boolean;
+  setPacienteContext: (ctx: PacienteContext) => void;
+  dismissPacienteBanner: () => void;
 }
 
 export const useSessionStore = create<SessionState>((set) => ({
@@ -27,4 +42,10 @@ export const useSessionStore = create<SessionState>((set) => ({
     set({ gasometriaSnapshot: snapshot, bannerDismissed: false }),
   dismissBanner: () => set({ bannerDismissed: true }),
   clearSnapshot: () => set({ gasometriaSnapshot: null, bannerDismissed: false }),
+
+  pacienteContext: null,
+  pacienteBannerDismissed: false,
+  setPacienteContext: (ctx) =>
+    set({ pacienteContext: ctx, pacienteBannerDismissed: false }),
+  dismissPacienteBanner: () => set({ pacienteBannerDismissed: true }),
 }));
