@@ -212,10 +212,30 @@ Quais dados adicionais ou exames confirmariam os achados calculados (ex: medida 
 }
 
 // ── Consulta Cirúrgica ────────────────────────────────────────
+export interface PacienteAIContext {
+  peso?: number;
+  altura?: number;
+  idade?: number;
+  sexo?: 'M' | 'F';
+  gasometria?: { pH: number; PaCO2: number; Lactato: number; };
+}
+
 export async function consultarCirurgia(
   cirurgia: GuiaCirurgico,
-  pergunta: string
+  pergunta: string,
+  paciente?: PacienteAIContext
 ): Promise<string> {
+  const ctxPaciente = paciente ? `
+CONTEXTO DO PACIENTE:
+${[
+    paciente.peso   != null ? `• Peso: ${paciente.peso} kg` : '',
+    paciente.altura != null ? `• Altura: ${paciente.altura} cm` : '',
+    paciente.idade  != null ? `• Idade: ${paciente.idade} anos` : '',
+    paciente.sexo   != null ? `• Sexo: ${paciente.sexo === 'M' ? 'Masculino' : 'Feminino'}` : '',
+    paciente.gasometria ? `• Gasometria: pH ${paciente.gasometria.pH} | PaCO2 ${paciente.gasometria.PaCO2} mmHg | Lactato ${paciente.gasometria.Lactato} mmol/L` : '',
+  ].filter(Boolean).join('\n')}
+` : '';
+
   const prompt = `Você é um Anestesiologista Sênior especialista em anestesia para ${cirurgia.especialidade}.
 
 CONTEXTO DA CIRURGIA — ${cirurgia.nome.toUpperCase()}:
@@ -225,12 +245,12 @@ CONTEXTO DA CIRURGIA — ${cirurgia.nome.toUpperCase()}:
 • Manejo e Correção: ${cirurgia.correcoes}
 • Pós-Operatório e Analgesia: ${cirurgia.posOp}
 • Referências: ${cirurgia.referencias}
-
+${ctxPaciente}
 PERGUNTA DO MÉDICO:
 ${pergunta}
 
 INSTRUÇÕES DE SAÍDA:
-Responda em Markdown, de forma direta e prática, focado em anestesiologia. Inclua doses, metas hemodinâmicas e condutas concretas quando aplicável. Máximo 400 palavras.`;
+Responda em Markdown, de forma direta e prática, focado em anestesiologia.${paciente ? ' Quando relevante, adapte doses e condutas ao contexto específico do paciente.' : ''} Inclua doses, metas hemodinâmicas e condutas concretas quando aplicável. Máximo 400 palavras.`;
 
   try {
     return await callAI(prompt, 'gemini-3.1-pro-preview');
