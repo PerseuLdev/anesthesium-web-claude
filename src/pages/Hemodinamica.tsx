@@ -320,6 +320,7 @@ export function Hemodinamica() {
   const bannerDismissed    = useSessionStore((s) => s.bannerDismissed);
   const dismissBanner      = useSessionStore((s) => s.dismissBanner);
   const showImportBanner   = gasometriaSnapshot !== null && !bannerDismissed;
+  const setPacienteContext = useSessionStore((s) => s.setPacienteContext);
 
   const handleChange = (name: keyof G3ProInput, val: number | string) => {
     setFormData((prev) => ({ ...prev, [name]: val }));
@@ -362,6 +363,13 @@ export function Hemodinamica() {
     setAiSuggestion(null);
     setCopied(false);
     setOpenSections({ hemo: true, acido_base: true, eletrolitos: true });
+    setPacienteContext({
+      peso:   formData.peso,
+      altura: formData.altura,
+      idade:  formData.idade,
+      sexo:   formData.sexo,
+      capturedAt: new Date().toISOString(),
+    });
     const id = addAvaliacao({
       pacienteId: `G3-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`,
       tipo: 'Hemodinamica',
