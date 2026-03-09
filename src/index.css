@@ -31,6 +31,14 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 32px -8px rgba(0, 0, 0, 0.5);
 }
 
+@media (max-width: 768px) {
+  .glass-panel {
+    background: rgba(24, 24, 27, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+}
+
 .hardware-text {
   font-family: var(--font-mono);
   letter-spacing: -0.02em;
