@@ -21,6 +21,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Gasometria />} />
+          <Route path="gasometria" element={<Gasometria />} />
           <Route path="drogas" element={<Drogas />} />
           <Route path="escores" element={<Escores />} />
           <Route path="calculadoras" element={<Calculadoras />} />

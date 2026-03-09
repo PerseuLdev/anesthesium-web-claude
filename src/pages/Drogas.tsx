@@ -3,13 +3,14 @@ import { useTranslation } from 'react-i18next';
 import {
   Pill, Search, AlertCircle, Check, Plus, X, Activity, Loader2,
   Sparkles, UserCheck, FlaskConical, ChevronRight, Zap, Brain,
-  Heart, Shield, Syringe, Droplets, RotateCcw,
+  Heart, Shield, Syringe, Droplets, RotateCcw, Calculator,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 
 import { DRUGS, Droga, PROTOCOLOS_SEDACAO, ProtocoloSedacao } from '../constants/drogas';
 import { calcularDroga } from '../lib/clinical/drogas';
+import { calcularIBW, calcularABW, calcularIMC, calcularVolumeCorrente } from '../lib/clinical/calculadoras';
 import { checkDrugInteractions, sugerirProtocoloSedacao } from '../lib/services/clinicalAiService';
 import { useHistoryStore } from '../lib/storage/historyStore';
 import { useSessionStore } from '../lib/storage/sessionStore';
@@ -111,8 +112,11 @@ export function Drogas() {
 
   // Patient inputs
   const [inputPeso, setInputPeso] = useState<number | ''>(70);
+  const [inputAltura, setInputAltura] = useState<number | ''>('');
   const [inputIdade, setInputIdade] = useState<number | ''>(30);
   const [inputTipo, setInputTipo] = useState<'Adulto' | 'Pediátrico'>('Adulto');
+  const [inputSexo, setInputSexo] = useState<'M' | 'F'>('M');
+  const [showCalculadoras, setShowCalculadoras] = useState(false);
 
   // Confirmed for calculation
   const [peso, setPeso] = useState<number>(70);
@@ -154,6 +158,8 @@ export function Drogas() {
       setInputPeso(pacienteContext.peso);
       setPeso(pacienteContext.peso);
     }
+    if (pacienteContext.altura != null) setInputAltura(pacienteContext.altura);
+    if (pacienteContext.sexo != null) setInputSexo(pacienteContext.sexo);
     if (pacienteContext.idade != null) {
       setInputIdade(pacienteContext.idade);
       setIdade(pacienteContext.idade);
@@ -316,45 +322,142 @@ export function Drogas() {
 
       {/* Patient inputs */}
       <Card className="bg-black/40 border-white/5">
-        <CardContent className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
-          <Input
-            label={t('drugs.weight')}
-            type="number"
-            value={inputPeso}
-            onChange={handleNumberChange(setInputPeso)}
-          />
-          <Input
-            label={t('drugs.age')}
-            type="number"
-            value={inputIdade}
-            onChange={handleNumberChange(setInputIdade)}
-          />
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{t('drugs.type')}</label>
-            <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 h-12">
-              <button
-                className={`flex-1 rounded-lg text-sm font-medium transition-all ${inputTipo === 'Adulto' ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
-                onClick={() => setInputTipo('Adulto')}
-              >
-                {t('drugs.adult')}
-              </button>
-              <button
-                className={`flex-1 rounded-lg text-sm font-medium transition-all ${inputTipo === 'Pediátrico' ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
-                onClick={() => setInputTipo('Pediátrico')}
-              >
-                {t('drugs.pediatric')}
-              </button>
-            </div>
+        <CardContent className="p-6 space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Input
+              label={t('drugs.weight')}
+              type="number"
+              value={inputPeso}
+              onChange={handleNumberChange(setInputPeso)}
+            />
+            <Input
+              label="Altura (cm)"
+              type="number"
+              value={inputAltura}
+              onChange={handleNumberChange(setInputAltura)}
+            />
+            <Input
+              label={t('drugs.age')}
+              type="number"
+              value={inputIdade}
+              onChange={handleNumberChange(setInputIdade)}
+            />
           </div>
-          <Button
-            onClick={handleConfirm}
-            className="h-12 w-full bg-cyan-500 text-black hover:bg-cyan-400 font-bold tracking-widest uppercase shadow-[0_0_20px_rgba(6,182,212,0.2)]"
-          >
-            <Check className="w-4 h-4 mr-2" />
-            Atualizar Doses
-          </Button>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-end">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{t('drugs.type')}</label>
+              <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 h-12">
+                <button
+                  className={`flex-1 rounded-lg text-sm font-medium transition-all ${inputTipo === 'Adulto' ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  onClick={() => setInputTipo('Adulto')}
+                >
+                  {t('drugs.adult')}
+                </button>
+                <button
+                  className={`flex-1 rounded-lg text-sm font-medium transition-all ${inputTipo === 'Pediátrico' ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  onClick={() => setInputTipo('Pediátrico')}
+                >
+                  {t('drugs.pediatric')}
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Sexo</label>
+              <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 h-12">
+                <button
+                  className={`flex-1 rounded-lg text-sm font-medium transition-all ${inputSexo === 'M' ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  onClick={() => setInputSexo('M')}
+                >
+                  Masc
+                </button>
+                <button
+                  className={`flex-1 rounded-lg text-sm font-medium transition-all ${inputSexo === 'F' ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  onClick={() => setInputSexo('F')}
+                >
+                  Fem
+                </button>
+              </div>
+            </div>
+            <Button
+              onClick={handleConfirm}
+              className="h-12 w-full bg-cyan-500 text-black hover:bg-cyan-400 font-bold tracking-widest uppercase shadow-[0_0_20px_rgba(6,182,212,0.2)]"
+            >
+              <Check className="w-4 h-4 mr-2" />
+              Atualizar Doses
+            </Button>
+          </div>
         </CardContent>
       </Card>
+
+      {/* ── Calculadoras ──────────────────────────────────────── */}
+      {(() => {
+        const alturaNum = Number(inputAltura) || 0;
+        const pesoNum   = Number(inputPeso)   || 0;
+        const ibw  = alturaNum > 100 ? calcularIBW(alturaNum, inputSexo) : null;
+        const imc  = alturaNum > 0 && pesoNum > 0 ? calcularIMC(alturaNum, pesoNum) : null;
+        const abw  = ibw !== null && imc !== null && imc > 30 ? calcularABW(pesoNum, ibw) : null;
+        const vt   = ibw !== null ? calcularVolumeCorrente(ibw) : null;
+        const hasData = ibw !== null || imc !== null;
+        const imcColor = imc === null ? '' : imc < 18.5 ? 'text-blue-400' : imc < 25 ? 'text-emerald-400' : imc < 30 ? 'text-amber-400' : 'text-rose-400';
+        const imcLabel = imc === null ? '' : imc < 18.5 ? 'Baixo peso' : imc < 25 ? 'Normal' : imc < 30 ? 'Sobrepeso' : 'Obesidade';
+        return (
+          <div>
+            <button
+              onClick={() => setShowCalculadoras(v => !v)}
+              className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors mb-3"
+            >
+              <Calculator className="w-4 h-4" />
+              Calculadoras
+              <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${showCalculadoras ? 'rotate-90' : ''}`} />
+            </button>
+            <AnimatePresence>
+              {showCalculadoras && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  {!hasData ? (
+                    <p className="text-xs text-zinc-600 pb-3">Preencha Peso, Altura e Sexo para ver os cálculos.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pb-2">
+                      {ibw !== null && (
+                        <div className="p-3 rounded-2xl bg-black/40 border border-white/5">
+                          <p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-1 font-bold">PIE</p>
+                          <p className="text-xl font-mono text-white">{ibw.toFixed(1)} <span className="text-xs text-zinc-500">kg</span></p>
+                          <p className="text-[10px] text-zinc-600 mt-0.5">Peso Ideal</p>
+                        </div>
+                      )}
+                      {imc !== null && (
+                        <div className="p-3 rounded-2xl bg-black/40 border border-white/5">
+                          <p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-1 font-bold">IMC</p>
+                          <p className={`text-xl font-mono ${imcColor}`}>{imc.toFixed(1)}</p>
+                          <p className="text-[10px] text-zinc-600 mt-0.5">{imcLabel}</p>
+                        </div>
+                      )}
+                      {abw !== null && (
+                        <div className="p-3 rounded-2xl bg-black/40 border border-white/5">
+                          <p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-1 font-bold">PIA</p>
+                          <p className="text-xl font-mono text-white">{abw.toFixed(1)} <span className="text-xs text-zinc-500">kg</span></p>
+                          <p className="text-[10px] text-zinc-600 mt-0.5">Peso Ajustado</p>
+                        </div>
+                      )}
+                      {vt !== null && (
+                        <div className="p-3 rounded-2xl bg-black/40 border border-white/5">
+                          <p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-1 font-bold">VT</p>
+                          <p className="text-xl font-mono text-white">{vt.toFixed(0)} <span className="text-xs text-zinc-500">mL</span></p>
+                          <p className="text-[10px] text-zinc-600 mt-0.5">Vol. Corrente</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })()}
 
       {/* ── Protocols ─────────────────────────────────────────── */}
       <div>

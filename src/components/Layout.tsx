@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { Activity, Pill, ClipboardList, Calculator, History, LogOut, ArrowUp, Heart, Scissors } from 'lucide-react';
+import { Activity, Pill, ClipboardList, History, LogOut, ArrowUp, Heart, Scissors } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -10,12 +10,11 @@ export function Layout() {
   const [showBackToTop, setShowBackToTop] = useState(false);
 
   const navItems = [
+    { to: '/escores', icon: ClipboardList, label: t('common.scores') },
     { to: '/cirurgias', icon: Scissors, label: 'Cirurgias' },
-    { to: '/', icon: Activity, label: t('common.gasometry') },
+    { to: '/gasometria', icon: Activity, label: t('common.gasometry') },
     { to: '/hemodinamica', icon: Heart, label: 'Hemo' },
     { to: '/drogas', icon: Pill, label: t('common.drugs') },
-    { to: '/calculadoras', icon: Calculator, label: t('common.calculators') },
-    { to: '/escores', icon: ClipboardList, label: t('common.scores') },
     { to: '/historico', icon: History, label: t('common.history') },
   ];
 
