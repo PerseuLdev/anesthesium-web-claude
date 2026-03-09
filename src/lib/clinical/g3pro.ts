@@ -5,32 +5,35 @@
 // ============================================================
 
 export interface G3ProInput {
-  // Antropometria
+  // Antropometria (sempre obrigatório)
   peso: number;
   altura: number;
   idade: number;
   sexo: 'M' | 'F';
-  // Vitais e Pressões
+  // Vitais básicas (sempre obrigatório)
   fc: number;
   pas: number;
   pad: number;
   pvc: number;
-  papm: number;
-  pcp: number;
-  pp_max: number;
-  pp_min: number;
-  // Oximetria e Gases (Arterial + Venoso)
+  // Pressão Pulmonar — Grupo B (Swan-Ganz / PAC) — opcional
+  papm: number | null;
+  pcp: number | null;
+  // Variação de Pressão de Pulso — Grupo C (VM + linha arterial) — opcional
+  pp_max: number | null;
+  pp_min: number | null;
+  // Oximetria e Gases — Arterial (sempre obrigatório)
   hb: number;
   sao2: number;   // %
-  svo2: number;   // %
   pao2: number;
-  pvo2: number;
   paco2: number;
-  pvco2: number;
   ph: number;
   hco3: number;
   lactato: number;
-  // Eletrólitos e Bioquímica
+  // Gasometria Venosa — Grupo A (linha central) — opcional
+  svo2: number | null;   // %
+  pvo2: number | null;
+  pvco2: number | null;
+  // Eletrólitos e Bioquímica (sempre obrigatório)
   na: number;
   cl: number;
   k: number;
@@ -44,32 +47,30 @@ export interface G3ProInput {
 }
 
 export interface HemoResult {
-  // Antropometria derivada
+  // Sempre disponível
   sc: number;
   vo2: number;
-  // Conteúdo e transporte de O2
-  cao2: number;
-  cvo2: number;
-  dav_o2: number;
-  ero2: number;
-  // Fluxo e desempenho (Fick)
-  dc: number;
-  ic: number;
-  vs: number;
-  is_index: number;
-  do2i: number;
-  // Pressões e resistências
   pam: number;
-  irvs: number;
-  irvp: number;
-  // Trabalho e contratilidade
-  lvswi: number;
-  rvswi: number;
-  cpo: number;
-  // Perfusão e funcional
-  deltapp: number;
-  gap_co2: number;
-  ratio: number;
+  cao2: number;
+  // Requer gasometria venosa — Grupo A
+  cvo2: number | null;
+  dav_o2: number | null;
+  ero2: number | null;
+  dc: number | null;
+  ic: number | null;
+  vs: number | null;
+  is_index: number | null;
+  do2i: number | null;
+  irvs: number | null;
+  lvswi: number | null;
+  cpo: number | null;
+  gap_co2: number | null;
+  ratio: number | null;
+  // Requer pressão pulmonar — Grupo B
+  irvp: number | null;
+  rvswi: number | null;
+  // Requer VPP — Grupo C
+  deltapp: number | null;
   // Alertas e classificação
   alertas: string[];
   choque?: 'cardiogenico' | 'obstrutivo' | 'hipovolemico' | 'distributivo' | 'misto';
@@ -110,69 +111,115 @@ export interface G3ProResult {
 // MÓDULO 1 — HEMODINÂMICA (Princípio de Fick + Derivados)
 // ============================================================
 export function calcularHemodinamica(d: G3ProInput): HemoResult {
-  // 1. Superfície corporal e VO2 estimado
+  // 1. Sempre disponível — antropometria e pressões básicas
   const sc = Math.sqrt((d.peso * d.altura) / 3600);
   const vo2 = sc * (157.3 - 0.6 * d.idade + (d.sexo === 'M' ? 10 : 0));
-
-  // 2. Conteúdo de O2 (arterial e venoso)
   const cao2 = d.hb * 1.34 * (d.sao2 / 100) + d.pao2 * 0.003;
-  const cvo2 = d.hb * 1.34 * (d.svo2 / 100) + d.pvo2 * 0.003;
-  const dav_o2 = cao2 - cvo2;
-  const ero2 = dav_o2 > 0 && cao2 > 0 ? (dav_o2 / cao2) * 100 : 0;
-
-  // 3. Débito cardíaco pelo Princípio de Fick
-  const dc = dav_o2 > 0 ? vo2 / (10 * dav_o2) : 0;
-  const ic = sc > 0 ? dc / sc : 0;
-  const vs = d.fc > 0 ? (dc * 1000) / d.fc : 0;
-  const is_index = sc > 0 ? vs / sc : 0;
-  const do2i = cao2 * ic * 10;
-
-  // 4. Pressão arterial média e resistências vasculares
   const pam = (d.pas + 2 * d.pad) / 3;
-  const irvs = ic > 0 ? ((pam - d.pvc) / ic) * 80 : 0;
-  const irvp = ic > 0 ? ((d.papm - d.pcp) / ic) * 80 : 0;
 
-  // 5. Trabalho ventricular e poder cardíaco
-  const lvswi = (pam - d.pvc) * is_index * 0.0136;
-  const rvswi = (d.papm - d.pvc) * is_index * 0.0136;
-  const cpo = pam > 0 && dc > 0 ? (pam * dc) / 451 : 0;
+  // 2. Grupo A — Gasometria Venosa (svo2, pvo2, pvco2)
+  let cvo2: number | null = null;
+  let dav_o2: number | null = null;
+  let ero2: number | null = null;
+  let dc: number | null = null;
+  let ic: number | null = null;
+  let vs: number | null = null;
+  let is_index: number | null = null;
+  let do2i: number | null = null;
+  let irvs: number | null = null;
+  let lvswi: number | null = null;
+  let cpo: number | null = null;
+  let gap_co2: number | null = null;
+  let ratio: number | null = null;
 
-  // 6. DeltaPP (fluido-responsividade), Gap V-A CO2, Ratio
-  const pp_medio = (d.pp_max + d.pp_min) / 2;
-  const deltapp = pp_medio > 0 ? ((d.pp_max - d.pp_min) / pp_medio) * 100 : 0;
-  const gap_co2 = d.pvco2 - d.paco2;
-  const ratio = dav_o2 > 0 ? gap_co2 / dav_o2 : 0;
+  if (d.svo2 !== null && d.pvo2 !== null) {
+    cvo2 = d.hb * 1.34 * (d.svo2 / 100) + d.pvo2 * 0.003;
+    dav_o2 = cao2 - cvo2;
+    ero2 = dav_o2 > 0 && cao2 > 0 ? (dav_o2 / cao2) * 100 : 0;
+    dc = dav_o2 > 0 ? vo2 / (10 * dav_o2) : 0;
+    ic = sc > 0 ? dc / sc : 0;
+    vs = d.fc > 0 ? (dc * 1000) / d.fc : 0;
+    is_index = sc > 0 ? vs / sc : 0;
+    do2i = cao2 * ic * 10;
+    irvs = ic > 0 ? ((pam - d.pvc) / ic) * 80 : 0;
+    lvswi = (pam - d.pvc) * is_index * 0.0136;
+    cpo = pam > 0 && dc > 0 ? (pam * dc) / 451 : 0;
+  }
 
-  // 7. Motor de alertas e classificação de choque
+  if (d.pvco2 !== null) {
+    gap_co2 = d.pvco2 - d.paco2;
+    if (dav_o2 !== null && dav_o2 > 0) {
+      ratio = gap_co2 / dav_o2;
+    }
+  }
+
+  // 3. Grupo B — Pressão Pulmonar (papm, pcp)
+  let irvp: number | null = null;
+  let rvswi: number | null = null;
+
+  if (d.papm !== null && d.pcp !== null) {
+    if (ic !== null && ic > 0) {
+      irvp = ((d.papm - d.pcp) / ic) * 80;
+    }
+    if (is_index !== null) {
+      rvswi = (d.papm - d.pvc) * is_index * 0.0136;
+    }
+  }
+
+  // 4. Grupo C — Variação de Pressão de Pulso (pp_max, pp_min)
+  let deltapp: number | null = null;
+
+  if (d.pp_max !== null && d.pp_min !== null) {
+    const pp_medio = (d.pp_max + d.pp_min) / 2;
+    deltapp = pp_medio > 0 ? ((d.pp_max - d.pp_min) / pp_medio) * 100 : 0;
+  }
+
+  // 5. Motor de alertas e classificação de choque
   const alertas: string[] = [];
   let choque: HemoResult['choque'] | undefined;
 
-  if (ic < 2.5) {
-    if (d.pcp > 15 && irvs > 1800) {
-      alertas.push('🚨 CARDIOGÊNICO: Baixo débito com congestão (PCP alta) e vasoconstrição (RVS alta).');
-      choque = 'cardiogenico';
-    } else if (d.pvc > 12 && d.pcp <= 15) {
-      alertas.push('🚨 OBSTRUTIVO/VD: Baixo débito com PVC elevada e PCP normal. Avaliar TEP ou disfunção de VD.');
-      choque = 'obstrutivo';
-    } else if (d.pcp <= 12 && d.pvc <= 8) {
-      alertas.push('🚨 HIPOVOLÊMICO: Baixo débito com pressões de enchimento baixas e RVS alta.');
-      choque = 'hipovolemico';
-    } else {
-      alertas.push('⚠️ BAIXO DÉBITO MISTO: IC < 2.5 com padrão não conclusivo. Revisar qualidade dos dados.');
-      choque = 'misto';
+  if (ic !== null) {
+    if (ic < 2.5) {
+      if (d.papm !== null && d.pcp !== null) {
+        // Classificação completa com pressão pulmonar
+        if (d.pcp > 15 && irvs !== null && irvs > 1800) {
+          alertas.push('🚨 CARDIOGÊNICO: Baixo débito com congestão (PCP alta) e vasoconstrição (RVS alta).');
+          choque = 'cardiogenico';
+        } else if (d.pvc > 12 && d.pcp <= 15) {
+          alertas.push('🚨 OBSTRUTIVO/VD: Baixo débito com PVC elevada e PCP normal. Avaliar TEP ou disfunção de VD.');
+          choque = 'obstrutivo';
+        } else if (d.pcp <= 12 && d.pvc <= 8) {
+          alertas.push('🚨 HIPOVOLÊMICO: Baixo débito com pressões de enchimento baixas e RVS alta.');
+          choque = 'hipovolemico';
+        } else {
+          alertas.push('⚠️ BAIXO DÉBITO MISTO: IC < 2.5 com padrão não conclusivo. Revisar qualidade dos dados.');
+          choque = 'misto';
+        }
+      } else {
+        // Classificação parcial sem pressão pulmonar
+        if (d.pvc <= 8) {
+          alertas.push('🚨 BAIXO DÉBITO com PVC baixa: padrão compatível com HIPOVOLEMIA. Pressão pulmonar ausente — ecocardiograma para confirmação.');
+          choque = 'hipovolemico';
+        } else {
+          alertas.push('🚨 BAIXO DÉBITO: IC < 2.5. Pressão pulmonar (Swan-Ganz) necessária para classificar padrão de choque (cardiogênico / obstrutivo / hipovolêmico).');
+          choque = 'misto';
+        }
+      }
+    } else if (ic > 4.0 && irvs !== null && irvs < 1500) {
+      alertas.push('🚨 DISTRIBUTIVO: Vasoplegia com débito aumentado (Sepse/SIRS?). IRVS baixo.');
+      choque = 'distributivo';
     }
-  } else if (ic > 4.0 && irvs < 1500) {
-    alertas.push('🚨 DISTRIBUTIVO: Vasoplegia com débito aumentado (Sepse/SIRS?). IRVS baixo.');
-    choque = 'distributivo';
   }
 
-  if (deltapp > 13) {
-    alertas.push('💧 FLUIDO-RESPONSIVO: DeltaPP > 13%. Alta probabilidade de resposta a volume (VM com VC ≥ 8 mL/kg).');
-  } else if (deltapp <= 10 && ic < 2.5) {
-    alertas.push('🛑 PROVÁVEL INOTRÓPICO: DeltaPP baixo com IC reduzido. Considere inodilatadores (Dobutamina/Milrinona).');
+  if (deltapp !== null) {
+    if (deltapp > 13) {
+      alertas.push('💧 FLUIDO-RESPONSIVO: DeltaPP > 13%. Alta probabilidade de resposta a volume (VM com VC ≥ 8 mL/kg).');
+    } else if (deltapp <= 10 && ic !== null && ic < 2.5) {
+      alertas.push('🛑 PROVÁVEL INOTRÓPICO: DeltaPP baixo com IC reduzido. Considere inodilatadores (Dobutamina/Milrinona).');
+    }
   }
 
-  if (ratio > 1.4) {
+  if (ratio !== null && ratio > 1.4) {
     alertas.push('🔬 ANAEROBIOSE CELULAR: Ratio ΔCO2/C(a-v)O2 > 1.4. Sofrimento celular mesmo sem hiperlactatemia inicial.');
   }
 
@@ -182,19 +229,19 @@ export function calcularHemodinamica(d: G3ProInput): HemoResult {
     alertas.push(`⚠️ HIPERLACTATEMIA: Lactato ${d.lactato} mmol/L. Investigar perfusão tecidual e clearance hepático.`);
   }
 
-  if (ero2 > 35) {
+  if (ero2 !== null && ero2 > 35) {
     alertas.push(`⚡ ERO2 ELEVADA: ${ero2.toFixed(1)}%. Tecidos extraindo O2 acima do limite — risco de débito de O2 crítico.`);
   }
 
-  if (cpo < 0.6 && ic < 2.5) {
+  if (cpo !== null && ic !== null && cpo < 0.6 && ic < 2.5) {
     alertas.push('💔 PODER CARDÍACO CRÍTICO (CPO < 0.6W): Associado a mortalidade > 50% em choque cardiogênico.');
   }
 
   return {
-    sc, vo2,
-    cao2, cvo2, dav_o2, ero2,
+    sc, vo2, cao2, pam,
+    cvo2, dav_o2, ero2,
     dc, ic, vs, is_index, do2i,
-    pam, irvs, irvp,
+    irvs, irvp,
     lvswi, rvswi, cpo,
     deltapp, gap_co2, ratio,
     alertas, choque,

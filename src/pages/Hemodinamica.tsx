@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Heart, Activity, AlertTriangle, Copy, Check,
@@ -23,12 +23,29 @@ import { gerarInterpretacaoG3Pro } from '../lib/services/clinicalAiService';
 type InputTab = 'antropometria' | 'pressoes' | 'gases' | 'eletrolitos';
 type ResultTab = 'hemo' | 'acido_base' | 'eletrolitos';
 
+// ─── Disponibilidade de grupos opcionais ─────────────────────
+interface DisponibilidadeState {
+  gasometriaVenosa: boolean;
+  pressaoPulmonar: boolean;
+  variacaoPressao: boolean;
+}
+
+// Defaults dos grupos quando habilitados
+const GROUP_DEFAULTS = {
+  gasometriaVenosa: { svo2: 70, pvo2: 38, pvco2: 46 },
+  pressaoPulmonar:  { papm: 18, pcp: 10 },
+  variacaoPressao:  { pp_max: 125, pp_min: 110 },
+};
+
 // ─── Defaults ────────────────────────────────────────────────
 const DEFAULTS: G3ProInput = {
   peso: 70, altura: 170, idade: 55, sexo: 'M',
-  fc: 80, pas: 120, pad: 75, pvc: 8, papm: 18, pcp: 10, pp_max: 125, pp_min: 110,
-  hb: 12, sao2: 97, svo2: 70, pao2: 95, pvo2: 38, paco2: 40, pvco2: 46,
+  fc: 80, pas: 120, pad: 75, pvc: 8,
+  papm: null, pcp: null,
+  pp_max: null, pp_min: null,
+  hb: 12, sao2: 97, pao2: 95, paco2: 40,
   ph: 7.40, hco3: 24, lactato: 1.2,
+  svo2: null, pvo2: null, pvco2: null,
   na: 140, cl: 104, k: 4.0, ca: 9.0, mg: 2.0, fosfato: 3.5,
   alb: 3.5, glicose: 100, ureia: 35, osm_medida: 290,
 };
@@ -58,6 +75,30 @@ function ColoredValue({ value, refKey, decimals = 1, unit }: ColoredValueProps) 
   );
 }
 
+// ─── Helper: valor nullable ───────────────────────────────────
+function NAValue() {
+  return <span className="font-mono text-zinc-500 text-sm">N/A</span>;
+}
+
+interface NullableColoredValueProps extends Omit<ColoredValueProps, 'value'> {
+  value: number | null;
+}
+function NullableColoredValue({ value, ...rest }: NullableColoredValueProps) {
+  if (value === null) return <NAValue />;
+  return <ColoredValue value={value} {...rest} />;
+}
+
+function NullableValue({ value, decimals = 1, unit }: { value: number | null; decimals?: number; unit?: string }) {
+  if (value === null) return <NAValue />;
+  const formatted = decimals === 0 ? Math.round(value).toString() : value.toFixed(decimals);
+  return (
+    <span className="font-mono font-bold text-zinc-200">
+      {formatted}
+      {unit && <span className="text-zinc-500 text-[10px] font-sans ml-0.5">{unit}</span>}
+    </span>
+  );
+}
+
 // ─── Helper: row de resultado ─────────────────────────────────
 function ResultRow({
   label, children, ref_range,
@@ -77,21 +118,66 @@ function ResultRow({
 interface NumInputProps {
   label: string;
   name: keyof G3ProInput;
-  value: number | string;
+  value: number | null;
   onChange: (name: keyof G3ProInput, val: number) => void;
   placeholder?: string;
   step?: string;
+  disabled?: boolean;
 }
-function NumInput({ label, name, value, onChange, placeholder, step = '0.1' }: NumInputProps) {
+function NumInput({ label, name, value, onChange, placeholder, step = '0.1', disabled }: NumInputProps) {
+  if (disabled) {
+    return (
+      <div>
+        <label className="block text-xs text-zinc-600 mb-2 uppercase tracking-wider font-mono">{label}</label>
+        <div className="h-10 flex items-center px-3 rounded-lg border border-white/5 bg-white/[0.02] text-zinc-600 text-sm font-mono cursor-not-allowed select-none">
+          N/D
+        </div>
+      </div>
+    );
+  }
   return (
     <Input
       label={label}
       type="number"
       step={step}
       placeholder={placeholder}
-      value={value as number}
+      value={value ?? ''}
       onChange={(e) => onChange(name, parseFloat(e.target.value) || 0)}
     />
+  );
+}
+
+// ─── Toggle de grupo de dados ─────────────────────────────────
+function ToggleGrupo({
+  label, descricao, enabled, onToggle,
+}: { label: string; descricao: string; enabled: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`flex items-center justify-between w-full py-2.5 px-3 rounded-xl border transition-all ${
+        enabled
+          ? 'border-rose-500/40 bg-rose-500/10 text-rose-300'
+          : 'border-white/8 bg-white/[0.02] text-zinc-500 hover:border-white/15 hover:bg-white/5'
+      }`}
+    >
+      <div className="text-left">
+        <span className="text-[10px] uppercase tracking-widest font-mono block">{label}</span>
+        <span className="text-[9px] text-zinc-600 font-mono">{descricao}</span>
+      </div>
+      <div className={`w-8 h-4 rounded-full transition-colors relative shrink-0 ml-3 ${enabled ? 'bg-rose-500' : 'bg-zinc-700'}`}>
+        <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${enabled ? 'left-[18px]' : 'left-0.5'}`} />
+      </div>
+    </button>
+  );
+}
+
+// ─── Aviso de dados indisponíveis ─────────────────────────────
+function AvailabilityNotice({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2 py-2.5 px-3 rounded-xl bg-zinc-800/40 border border-zinc-700/40">
+      <span className="text-zinc-600 text-[10px] font-mono uppercase tracking-wider">{label}</span>
+    </div>
   );
 }
 
@@ -149,6 +235,11 @@ function ResultSection({
 // ═══════════════════════════════════════════════════════════════
 export function Hemodinamica() {
   const [formData, setFormData] = useState<G3ProInput>(DEFAULTS);
+  const [disponivel, setDisponivel] = useState<DisponibilidadeState>({
+    gasometriaVenosa: false,
+    pressaoPulmonar:  false,
+    variacaoPressao:  false,
+  });
   const [activeInputTab, setActiveInputTab] = useState<InputTab>('antropometria');
   const [resultado, setResultado] = useState<G3ProResult | null>(null);
   const [openSections, setOpenSections] = useState<Record<ResultTab, boolean>>({
@@ -164,6 +255,19 @@ export function Hemodinamica() {
 
   const handleChange = (name: keyof G3ProInput, val: number | string) => {
     setFormData((prev) => ({ ...prev, [name]: val }));
+  };
+
+  const handleToggleGrupo = (grupo: keyof DisponibilidadeState) => {
+    const novoEstado = !disponivel[grupo];
+    setDisponivel((prev) => ({ ...prev, [grupo]: novoEstado }));
+    if (novoEstado) {
+      setFormData((prev) => ({ ...prev, ...GROUP_DEFAULTS[grupo] }));
+    } else {
+      const nullValues = Object.fromEntries(
+        Object.keys(GROUP_DEFAULTS[grupo]).map((k) => [k, null])
+      );
+      setFormData((prev) => ({ ...prev, ...nullValues }));
+    }
   };
 
   const handleCalcular = (e: React.FormEvent) => {
@@ -199,11 +303,12 @@ export function Hemodinamica() {
   const handleCopy = () => {
     if (!resultado) return;
     const { hemo, acido_base, eletrolitos } = resultado;
+    const fmtN = (v: number | null, d = 1) => v !== null ? v.toFixed(d) : 'N/A';
     const text = [
       '═══ G3-Pro · Análise Hemodinâmica Integrada ═══',
-      `IC: ${hemo.ic.toFixed(2)} L/min/m² | IRVS: ${hemo.irvs.toFixed(0)} | DeltaPP: ${hemo.deltapp.toFixed(1)}%`,
-      `Gap CO2: ${hemo.gap_co2.toFixed(1)} mmHg | Ratio: ${hemo.ratio.toFixed(2)} | CPO: ${hemo.cpo.toFixed(2)} W`,
-      `Lactato: ${formData.lactato} mmol/L | ERO2: ${hemo.ero2.toFixed(1)}%`,
+      `IC: ${fmtN(hemo.ic, 2)} L/min/m² | IRVS: ${fmtN(hemo.irvs, 0)} | DeltaPP: ${hemo.deltapp !== null ? hemo.deltapp.toFixed(1) + '%' : 'N/A'}`,
+      `Gap CO2: ${fmtN(hemo.gap_co2)} mmHg | Ratio: ${fmtN(hemo.ratio, 2)} | CPO: ${fmtN(hemo.cpo, 2)} W`,
+      `Lactato: ${formData.lactato} mmol/L | ERO2: ${hemo.ero2 !== null ? hemo.ero2.toFixed(1) + '%' : 'N/A'}`,
       hemo.choque ? `Padrão: CHOQUE ${hemo.choque.toUpperCase()}` : '',
       '',
       '─── Ácido-Base ───',
@@ -327,10 +432,30 @@ export function Hemodinamica() {
                         <NumInput label="PAS (mmHg)" name="pas" value={formData.pas} onChange={handleChange} placeholder="120" step="1" />
                         <NumInput label="PAD (mmHg)" name="pad" value={formData.pad} onChange={handleChange} placeholder="75" step="1" />
                         <NumInput label="PVC (mmHg)" name="pvc" value={formData.pvc} onChange={handleChange} placeholder="8" step="1" />
-                        <NumInput label="PAP Média (mmHg)" name="papm" value={formData.papm} onChange={handleChange} placeholder="18" step="1" />
-                        <NumInput label="PCP / Wedge (mmHg)" name="pcp" value={formData.pcp} onChange={handleChange} placeholder="10" step="1" />
-                        <NumInput label="PP Máx (mmHg)" name="pp_max" value={formData.pp_max} onChange={handleChange} placeholder="125" step="1" />
-                        <NumInput label="PP Mín (mmHg)" name="pp_min" value={formData.pp_min} onChange={handleChange} placeholder="110" step="1" />
+                      </div>
+
+                      {/* Toggle — Pressão Pulmonar */}
+                      <ToggleGrupo
+                        label="Pressão Pulmonar disponível"
+                        descricao="Swan-Ganz / Cateter de Artéria Pulmonar"
+                        enabled={disponivel.pressaoPulmonar}
+                        onToggle={() => handleToggleGrupo('pressaoPulmonar')}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <NumInput label="PAP Média (mmHg)" name="papm" value={formData.papm} onChange={handleChange} placeholder="18" step="1" disabled={!disponivel.pressaoPulmonar} />
+                        <NumInput label="PCP / Wedge (mmHg)" name="pcp" value={formData.pcp} onChange={handleChange} placeholder="10" step="1" disabled={!disponivel.pressaoPulmonar} />
+                      </div>
+
+                      {/* Toggle — VPP */}
+                      <ToggleGrupo
+                        label="Variação de Pressão de Pulso disponível"
+                        descricao="Ventilação mecânica + linha arterial invasiva"
+                        enabled={disponivel.variacaoPressao}
+                        onToggle={() => handleToggleGrupo('variacaoPressao')}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <NumInput label="PP Máx (mmHg)" name="pp_max" value={formData.pp_max} onChange={handleChange} placeholder="125" step="1" disabled={!disponivel.variacaoPressao} />
+                        <NumInput label="PP Mín (mmHg)" name="pp_min" value={formData.pp_min} onChange={handleChange} placeholder="110" step="1" disabled={!disponivel.variacaoPressao} />
                       </div>
                     </motion.div>
                   )}
@@ -351,11 +476,21 @@ export function Hemodinamica() {
                         <NumInput label="HCO3 (mEq/L)" name="hco3" value={formData.hco3} onChange={handleChange} placeholder="24" />
                         <NumInput label="Lactato (mmol/L)" name="lactato" value={formData.lactato} onChange={handleChange} placeholder="1.2" />
                       </div>
-                      <p className="text-[10px] text-indigo-400/70 font-mono">— Venoso misto / central —</p>
+
+                      {/* Toggle — Gasometria Venosa */}
+                      <ToggleGrupo
+                        label="Gasometria venosa disponível"
+                        descricao="Linha central — SvO2 / PvO2 / PvCO2"
+                        enabled={disponivel.gasometriaVenosa}
+                        onToggle={() => handleToggleGrupo('gasometriaVenosa')}
+                      />
+                      <p className={`text-[10px] font-mono transition-colors ${disponivel.gasometriaVenosa ? 'text-indigo-400/70' : 'text-zinc-600'}`}>
+                        — Venoso misto / central —
+                      </p>
                       <div className="grid grid-cols-2 gap-4">
-                        <NumInput label="SvO2 (%)" name="svo2" value={formData.svo2} onChange={handleChange} placeholder="70" step="1" />
-                        <NumInput label="PvO2 (mmHg)" name="pvo2" value={formData.pvo2} onChange={handleChange} placeholder="38" step="1" />
-                        <NumInput label="PvCO2 (mmHg)" name="pvco2" value={formData.pvco2} onChange={handleChange} placeholder="46" step="1" />
+                        <NumInput label="SvO2 (%)" name="svo2" value={formData.svo2} onChange={handleChange} placeholder="70" step="1" disabled={!disponivel.gasometriaVenosa} />
+                        <NumInput label="PvO2 (mmHg)" name="pvo2" value={formData.pvo2} onChange={handleChange} placeholder="38" step="1" disabled={!disponivel.gasometriaVenosa} />
+                        <NumInput label="PvCO2 (mmHg)" name="pvco2" value={formData.pvco2} onChange={handleChange} placeholder="46" step="1" disabled={!disponivel.gasometriaVenosa} />
                       </div>
                     </motion.div>
                   )}
@@ -458,16 +593,39 @@ export function Hemodinamica() {
                 {/* ── Cabeçalho de resultado ── */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${resultado.hemo.choque ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
+                    <div className={`w-2 h-2 rounded-full ${
+                      resultado.hemo.choque
+                        ? 'bg-rose-500 animate-pulse'
+                        : resultado.hemo.ic === null
+                          ? 'bg-zinc-600'
+                          : 'bg-emerald-500'
+                    }`} />
                     <span className="text-xs text-zinc-400 uppercase tracking-widest font-mono">
                       {resultado.hemo.choque
                         ? `Choque ${resultado.hemo.choque.charAt(0).toUpperCase() + resultado.hemo.choque.slice(1)}`
-                        : 'Sem padrão de choque'}
+                        : resultado.hemo.ic === null
+                          ? 'Hemodinâmica incompleta'
+                          : 'Sem padrão de choque'}
                     </span>
                   </div>
                   <Button variant="ghost" size="icon" onClick={handleCopy} className="w-8 h-8 text-zinc-400 hover:text-white">
                     {copied ? <Check className="w-4 h-4 text-rose-400" /> : <Copy className="w-4 h-4" />}
                   </Button>
+                </div>
+
+                {/* ── Legenda de cores ── */}
+                <div className="flex items-center gap-4 px-1">
+                  {[
+                    { color: 'bg-cyan-400',    label: 'Normal' },
+                    { color: 'bg-rose-400',    label: 'Abaixo' },
+                    { color: 'bg-emerald-400', label: 'Acima'  },
+                    { color: 'bg-zinc-500',    label: 'N/A'    },
+                  ].map(({ color, label }) => (
+                    <div key={label} className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${color}`} />
+                      <span className="text-[9px] text-zinc-600 font-mono uppercase tracking-wider">{label}</span>
+                    </div>
+                  ))}
                 </div>
 
                 {/* ── Chips de alerta ── */}
@@ -493,37 +651,50 @@ export function Hemodinamica() {
                   onToggle={() => toggleSection('hemo')}
                 >
                   <div className="space-y-1 mt-2">
+
                     <p className="text-[10px] text-zinc-600 uppercase tracking-widest font-mono mb-3">— Fluxo e Débito (Fick) —</p>
+
+                    {resultado.hemo.ic === null && (
+                      <div className="flex items-center gap-2 py-2 px-3 rounded-xl bg-zinc-800/40 border border-zinc-700/40 mb-3">
+                        <span className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider">
+                          Gasometria venosa não informada — cálculos por Fick indisponíveis
+                        </span>
+                      </div>
+                    )}
+
                     <ResultRow label="Índice Cardíaco (IC)" ref_range="2.5–4.0 L/min/m²">
-                      <ColoredValue value={resultado.hemo.ic} refKey="ic" decimals={2} unit="L/min/m²" />
+                      <NullableColoredValue value={resultado.hemo.ic} refKey="ic" decimals={2} unit="L/min/m²" />
                     </ResultRow>
                     <ResultRow label="Débito Cardíaco (DC)">
-                      <span className="font-mono font-bold text-zinc-200">{resultado.hemo.dc.toFixed(2)} <span className="text-zinc-500 text-[10px]">L/min</span></span>
+                      <NullableValue value={resultado.hemo.dc} decimals={2} unit="L/min" />
                     </ResultRow>
                     <ResultRow label="Vol. Sistólico (VS)" ref_range="60–100 mL">
-                      <ColoredValue value={resultado.hemo.vs} refKey="vs" decimals={1} unit="mL" />
+                      <NullableColoredValue value={resultado.hemo.vs} refKey="vs" decimals={1} unit="mL" />
                     </ResultRow>
                     <ResultRow label="IS (índice)" ref_range="33–50 mL/m²">
-                      <ColoredValue value={resultado.hemo.is_index} refKey="is_index" decimals={1} unit="mL/m²" />
+                      <NullableColoredValue value={resultado.hemo.is_index} refKey="is_index" decimals={1} unit="mL/m²" />
                     </ResultRow>
 
                     <p className="text-[10px] text-zinc-600 uppercase tracking-widest font-mono mb-3 mt-4">— Transporte de O₂ —</p>
                     <ResultRow label="DO2i" ref_range="520–720 mL/min/m²">
-                      <ColoredValue value={resultado.hemo.do2i} refKey="do2i" decimals={1} unit="mL/min/m²" />
+                      <NullableColoredValue value={resultado.hemo.do2i} refKey="do2i" decimals={1} unit="mL/min/m²" />
                     </ResultRow>
                     <ResultRow label="Extração O₂ (ERO2)" ref_range="22–30%">
-                      <ColoredValue value={resultado.hemo.ero2} refKey="ero2" decimals={1} unit="%" />
+                      <NullableColoredValue value={resultado.hemo.ero2} refKey="ero2" decimals={1} unit="%" />
                     </ResultRow>
                     <ResultRow label="C(a-v)O₂ (DAV)">
-                      <span className="font-mono font-bold text-zinc-200">{resultado.hemo.dav_o2.toFixed(2)} <span className="text-zinc-500 text-[10px]">mL/dL</span></span>
+                      <NullableValue value={resultado.hemo.dav_o2} decimals={2} unit="mL/dL" />
                     </ResultRow>
 
                     <p className="text-[10px] text-zinc-600 uppercase tracking-widest font-mono mb-3 mt-4">— Resistências —</p>
                     <ResultRow label="IRVS" ref_range="1700–2400">
-                      <ColoredValue value={resultado.hemo.irvs} refKey="irvs" decimals={0} unit="dyn·s·cm⁻⁵·m²" />
+                      <NullableColoredValue value={resultado.hemo.irvs} refKey="irvs" decimals={0} unit="dyn·s·cm⁻⁵·m²" />
                     </ResultRow>
                     <ResultRow label="IRVP" ref_range="< 250">
-                      <ColoredValue value={resultado.hemo.irvp} refKey="irvp" decimals={0} unit="dyn·s·cm⁻⁵·m²" />
+                      {resultado.hemo.irvp !== null
+                        ? <ColoredValue value={resultado.hemo.irvp} refKey="irvp" decimals={0} unit="dyn·s·cm⁻⁵·m²" />
+                        : <NAValue />
+                      }
                     </ResultRow>
                     <ResultRow label="PAM calc.">
                       <span className="font-mono font-bold text-cyan-400">{resultado.hemo.pam.toFixed(1)} <span className="text-zinc-500 text-[10px]">mmHg</span></span>
@@ -531,24 +702,33 @@ export function Hemodinamica() {
 
                     <p className="text-[10px] text-zinc-600 uppercase tracking-widest font-mono mb-3 mt-4">— Contratilidade e Perfusão —</p>
                     <ResultRow label="CPO (Poder Cardíaco)" ref_range="> 0.6W">
-                      <ColoredValue value={resultado.hemo.cpo} refKey="cpo" decimals={2} unit="W" />
+                      <NullableColoredValue value={resultado.hemo.cpo} refKey="cpo" decimals={2} unit="W" />
                     </ResultRow>
                     <ResultRow label="LVSWI" ref_range="44–64 g·m/m²">
-                      <ColoredValue value={resultado.hemo.lvswi} refKey="lvswi" decimals={1} unit="g·m/m²" />
+                      <NullableColoredValue value={resultado.hemo.lvswi} refKey="lvswi" decimals={1} unit="g·m/m²" />
                     </ResultRow>
                     <ResultRow label="RVSWI" ref_range="4–8 g·m/m²">
-                      <ColoredValue value={resultado.hemo.rvswi} refKey="rvswi" decimals={1} unit="g·m/m²" />
+                      {resultado.hemo.rvswi !== null
+                        ? <ColoredValue value={resultado.hemo.rvswi} refKey="rvswi" decimals={1} unit="g·m/m²" />
+                        : <NAValue />
+                      }
                     </ResultRow>
 
                     <p className="text-[10px] text-zinc-600 uppercase tracking-widest font-mono mb-3 mt-4">— Micro-hemodinâmica —</p>
                     <ResultRow label="DeltaPP (fluido-resp.)" ref_range="< 13%">
-                      <ColoredValue value={resultado.hemo.deltapp} refKey="deltapp" decimals={1} unit="%" />
+                      {resultado.hemo.deltapp !== null
+                        ? <ColoredValue value={resultado.hemo.deltapp} refKey="deltapp" decimals={1} unit="%" />
+                        : <NAValue />
+                      }
                     </ResultRow>
                     <ResultRow label="Gap V-A CO₂" ref_range="2–6 mmHg">
-                      <ColoredValue value={resultado.hemo.gap_co2} refKey="gap_co2" decimals={1} unit="mmHg" />
+                      <NullableColoredValue value={resultado.hemo.gap_co2} refKey="gap_co2" decimals={1} unit="mmHg" />
                     </ResultRow>
                     <ResultRow label="Ratio ΔCO₂/C(a-v)O₂" ref_range="< 1.4">
-                      <ColoredValue value={resultado.hemo.ratio} refKey="ratio" decimals={2} />
+                      {resultado.hemo.ratio !== null
+                        ? <ColoredValue value={resultado.hemo.ratio} refKey="ratio" decimals={2} />
+                        : <NAValue />
+                      }
                     </ResultRow>
                   </div>
                 </ResultSection>

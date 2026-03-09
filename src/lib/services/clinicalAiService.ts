@@ -2,6 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import { GasometriaOutput } from '../clinical/gasometria';
 import { G3ProInput, G3ProResult } from '../clinical/g3pro';
 import { Droga } from '../../constants/drogas';
+import { GuiaCirurgico } from '../../constants/cirurgias';
 
 let ai: GoogleGenAI | null = null;
 
@@ -111,6 +112,25 @@ export async function gerarInterpretacaoG3Pro(
   const { hemo, acido_base, eletrolitos } = resultado;
   const todosAlertas = [...hemo.alertas, ...eletrolitos.alertas];
 
+  // Helper para formatar valores opcionais
+  const fmtN = (v: number | null, d = 1) => v !== null ? v.toFixed(d) : 'N/A';
+
+  // Identificar grupos de dados ausentes
+  const dadosAusentes: string[] = [];
+  if (input.svo2 === null || input.pvo2 === null || input.pvco2 === null) {
+    dadosAusentes.push('Gasometria venosa (SvO2/PvO2/PvCO2) — cálculos Fick indisponíveis');
+  }
+  if (input.papm === null || input.pcp === null) {
+    dadosAusentes.push('Pressão pulmonar (PAPm/PCP) — IRVP e RVSWI indisponíveis');
+  }
+  if (input.pp_max === null || input.pp_min === null) {
+    dadosAusentes.push('Variação de pressão de pulso (PP máx/mín) — DeltaPP indisponível');
+  }
+
+  const secaoAusentes = dadosAusentes.length > 0
+    ? `\nDADOS NÃO DISPONÍVEIS NO MOMENTO DA AVALIAÇÃO:\n${dadosAusentes.map(g => `• ${g}`).join('\n')}\nNão inferir valores ausentes — restringir análise aos dados disponíveis.\n`
+    : '';
+
   const prompt = `Você é um Médico Intensivista Sênior revisando os resultados de uma calculadora hemodinâmica integrada (G3-Pro).
 
 CONTEXTO CRÍTICO — LEIA ANTES DE ANALISAR:
@@ -120,7 +140,8 @@ Sua análise deve:
 1. Avaliar a PLAUSIBILIDADE CLÍNICA do conjunto de resultados (não os valores isolados). Ex: IC 0.9 + FC 110 + PAM 75 sem sinais de choque clínico → questionar a acurácia dos inputs.
 2. Se o padrão for internamente coerente (IC baixo + lactato alto + ERO2 alta + Gap CO2 alto), reforçar a conclusão.
 3. Propor conduta PRIORIZANDO a incerteza dos valores calculados.
-
+4. Para campos marcados como N/A: não tente inferir — reconheça a limitação e indique quais dados completariam a análise.
+${secaoAusentes}
 ═══════════════════════════════════════
 DADOS DO PACIENTE
 ═══════════════════════════════════════
@@ -129,20 +150,20 @@ SC: ${hemo.sc.toFixed(2)} m² | VO2 estimado: ${hemo.vo2.toFixed(0)} mL/min
 
 SINAIS VITAIS E PRESSÕES:
 FC: ${input.fc} bpm | PAS: ${input.pas} / PAD: ${input.pad} mmHg | PAM calc: ${hemo.pam.toFixed(1)} mmHg
-PVC: ${input.pvc} mmHg | PAP Média: ${input.papm} mmHg | PCP (Wedge): ${input.pcp} mmHg
+PVC: ${input.pvc} mmHg | PAP Média: ${input.papm !== null ? input.papm + ' mmHg' : 'N/A'} | PCP (Wedge): ${input.pcp !== null ? input.pcp + ' mmHg' : 'N/A'}
 
 HEMODINÂMICA CALCULADA (Módulo 1 — Fick):
-• Débito Cardíaco: ${hemo.dc.toFixed(2)} L/min
-• Índice Cardíaco (IC): ${hemo.ic.toFixed(2)} L/min/m² [Ref: 2.5–4.0]
-• Volume Sistólico: ${hemo.vs.toFixed(1)} mL | IS: ${hemo.is_index.toFixed(1)} mL/m²
-• DO2i: ${hemo.do2i.toFixed(1)} mL/min/m² | ERO2: ${hemo.ero2.toFixed(1)}% [Ref: 22–30%]
-• IRVS: ${hemo.irvs.toFixed(0)} dyn·s·cm⁻⁵·m² [Ref: 1700–2400]
-• IRVP: ${hemo.irvp.toFixed(0)} dyn·s·cm⁻⁵·m²
-• Poder Cardíaco (CPO): ${hemo.cpo.toFixed(2)} W [Ref: >0.6W]
-• LVSWI: ${hemo.lvswi.toFixed(1)} g·m/m² | RVSWI: ${hemo.rvswi.toFixed(1)} g·m/m²
-• DeltaPP: ${hemo.deltapp.toFixed(1)}% [Fluido-responsivo se >13%]
-• Gap V-A CO2: ${hemo.gap_co2.toFixed(1)} mmHg [Ref: 2–6]
-• Ratio ΔCO2/C(a-v)O2: ${hemo.ratio.toFixed(2)} [Anaerobiose se >1.4]
+• Débito Cardíaco: ${fmtN(hemo.dc, 2)} L/min
+• Índice Cardíaco (IC): ${fmtN(hemo.ic, 2)} L/min/m² [Ref: 2.5–4.0]
+• Volume Sistólico: ${fmtN(hemo.vs, 1)} mL | IS: ${fmtN(hemo.is_index, 1)} mL/m²
+• DO2i: ${fmtN(hemo.do2i, 1)} mL/min/m² | ERO2: ${fmtN(hemo.ero2, 1)}% [Ref: 22–30%]
+• IRVS: ${fmtN(hemo.irvs, 0)} dyn·s·cm⁻⁵·m² [Ref: 1700–2400]
+• IRVP: ${fmtN(hemo.irvp, 0)} dyn·s·cm⁻⁵·m²
+• Poder Cardíaco (CPO): ${fmtN(hemo.cpo, 2)} W [Ref: >0.6W]
+• LVSWI: ${fmtN(hemo.lvswi, 1)} g·m/m² | RVSWI: ${fmtN(hemo.rvswi, 1)} g·m/m²
+• DeltaPP: ${hemo.deltapp !== null ? hemo.deltapp.toFixed(1) + '%' : 'N/A'} [Fluido-responsivo se >13%]
+• Gap V-A CO2: ${fmtN(hemo.gap_co2, 1)} mmHg [Ref: 2–6]
+• Ratio ΔCO2/C(a-v)O2: ${fmtN(hemo.ratio, 2)} [Anaerobiose se >1.4]
 • Lactato: ${input.lactato} mmol/L
 ${hemo.choque ? `• Padrão identificado pelo sistema: CHOQUE ${hemo.choque.toUpperCase()}` : '• Sem padrão de choque identificado pelo sistema'}
 
@@ -171,22 +192,51 @@ INSTRUÇÕES DE SAÍDA (Markdown, direto, sem introduções genéricas)
 Avalie se o conjunto de resultados é fisiologicamente coerente entre si. Flagge valores que parecem implausíveis para o quadro descrito.
 
 ## 2. Padrão Hemodinâmico Integrado
-Identifique o padrão predominante integrando IC + IRVS + DeltaPP + Ratio + Lactato + Gap CO2. Se houver choque, classifique e detalhe.
+Identifique o padrão predominante integrando IC + IRVS + DeltaPP + Ratio + Lactato + Gap CO2. Se houver choque, classifique e detalhe. Mencione limitações decorrentes de dados ausentes (N/A).
 
 ## 3. Impacto Metabólico e Ácido-Base
 Relacione o distúrbio ácido-base com o padrão hemodinâmico. O distúrbio é consequência ou causa do quadro?
 
 ## 4. Conduta Priorizada (3–5 ações concretas)
-Em ordem de urgência, considerando a incerteza dos valores calculados.
+Em ordem de urgência, considerando a incerteza dos valores calculados e os dados ausentes.
 
 ## 5. O que confirmar ou refutar
-Quais dados adicionais ou exames confirmariam os achados calculados (ex: medida direta de DC por termodiluição, ecocardiograma, etc.).`;
+Quais dados adicionais ou exames confirmariam os achados calculados (ex: medida direta de DC por termodiluição, ecocardiograma, etc.). Inclua especificamente os dados marcados como N/A que seriam mais relevantes obter.`;
 
   try {
     return await callAI(prompt);
   } catch (error) {
     console.error('Erro ao gerar interpretação G3-Pro:', error);
     throw new Error('Falha ao comunicar com a IA para gerar a interpretação hemodinâmica.');
+  }
+}
+
+// ── Consulta Cirúrgica ────────────────────────────────────────
+export async function consultarCirurgia(
+  cirurgia: GuiaCirurgico,
+  pergunta: string
+): Promise<string> {
+  const prompt = `Você é um Anestesiologista Sênior especialista em anestesia para ${cirurgia.especialidade}.
+
+CONTEXTO DA CIRURGIA — ${cirurgia.nome.toUpperCase()}:
+• Tempos Cirúrgicos: ${cirurgia.tempos}
+• Técnica Anestésica: ${cirurgia.tecnica}
+• Desafios e Problemas: ${cirurgia.problemas}
+• Manejo e Correção: ${cirurgia.correcoes}
+• Pós-Operatório e Analgesia: ${cirurgia.posOp}
+• Referências: ${cirurgia.referencias}
+
+PERGUNTA DO MÉDICO:
+${pergunta}
+
+INSTRUÇÕES DE SAÍDA:
+Responda em Markdown, de forma direta e prática, focado em anestesiologia. Inclua doses, metas hemodinâmicas e condutas concretas quando aplicável. Máximo 400 palavras.`;
+
+  try {
+    return await callAI(prompt, 'gemini-3.1-pro-preview');
+  } catch (error) {
+    console.error('Erro ao consultar IA sobre cirurgia:', error);
+    throw new Error('Falha ao comunicar com a IA para a consulta cirúrgica.');
   }
 }
 
