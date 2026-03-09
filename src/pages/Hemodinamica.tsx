@@ -4,8 +4,10 @@ import {
   Heart, Activity, AlertTriangle, Copy, Check,
   Loader2, Sparkles, ChevronDown, ChevronRight,
   Zap, Droplets, FlaskConical, User,
+  Download, Clock, X,
 } from 'lucide-react';
 import Markdown from 'react-markdown';
+import { useSessionStore, GasometriaSnapshot } from '../lib/storage/sessionStore';
 
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
@@ -230,6 +232,67 @@ function ResultSection({
   );
 }
 
+// ─── Banner: importar dados de gasometria ─────────────────────
+interface GasometriaBannerProps {
+  snapshot: GasometriaSnapshot;
+  onImport: () => void;
+  onDismiss: () => void;
+}
+
+function GasometriaBanner({ snapshot, onImport, onDismiss }: GasometriaBannerProps) {
+  const ageLabel = (() => {
+    const diffMin = Math.floor((Date.now() - new Date(snapshot.capturedAt).getTime()) / 60000);
+    if (diffMin < 1) return 'agora mesmo';
+    if (diffMin === 1) return '1 min atrás';
+    if (diffMin < 60) return `${diffMin} min atrás`;
+    const h = Math.floor(diffMin / 60);
+    return h === 1 ? '1 h atrás' : `${h} h atrás`;
+  })();
+
+  const campos = ['pH', 'PaCO2', 'HCO3', snapshot.PaO2 != null ? 'PaO2' : null, 'Lactato', 'Na', 'Cl', 'Alb']
+    .filter(Boolean).join(' · ');
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ type: 'spring', stiffness: 280, damping: 26 }}
+      className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3"
+    >
+      <div className="mt-0.5 shrink-0 w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center">
+        <Download className="w-4 h-4 text-amber-400" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+          Dados de Gasometria Disponíveis
+        </p>
+        <p className="text-[11px] text-zinc-400 font-mono mt-0.5 flex items-center gap-1.5 flex-wrap">
+          <Clock className="w-3 h-3 text-zinc-500 shrink-0" />
+          {ageLabel} &nbsp;·&nbsp; {campos}
+        </p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          type="button"
+          onClick={onImport}
+          className="h-8 px-3 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold uppercase tracking-wider hover:bg-amber-500/30 transition-colors"
+        >
+          Importar
+        </button>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-white/5 transition-colors"
+          aria-label="Ignorar"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ═══════════════════════════════════════════════════════════════
@@ -253,6 +316,11 @@ export function Hemodinamica() {
   const addAvaliacao = useHistoryStore((s) => s.addAvaliacao);
   const updateAvaliacao = useHistoryStore((s) => s.updateAvaliacao);
 
+  const gasometriaSnapshot = useSessionStore((s) => s.gasometriaSnapshot);
+  const bannerDismissed    = useSessionStore((s) => s.bannerDismissed);
+  const dismissBanner      = useSessionStore((s) => s.dismissBanner);
+  const showImportBanner   = gasometriaSnapshot !== null && !bannerDismissed;
+
   const handleChange = (name: keyof G3ProInput, val: number | string) => {
     setFormData((prev) => ({ ...prev, [name]: val }));
   };
@@ -268,6 +336,23 @@ export function Hemodinamica() {
       );
       setFormData((prev) => ({ ...prev, ...nullValues }));
     }
+  };
+
+  const handleImportGasometria = () => {
+    if (!gasometriaSnapshot) return;
+    setFormData((prev) => ({
+      ...prev,
+      ph:      gasometriaSnapshot.pH,
+      paco2:   gasometriaSnapshot.PaCO2,
+      hco3:    gasometriaSnapshot.HCO3,
+      pao2:    gasometriaSnapshot.PaO2 ?? prev.pao2,
+      lactato: gasometriaSnapshot.Lactato,
+      na:      gasometriaSnapshot.Na,
+      cl:      gasometriaSnapshot.Cl,
+      alb:     gasometriaSnapshot.Albumina,
+    }));
+    setActiveInputTab('gases');
+    dismissBanner();
   };
 
   const handleCalcular = (e: React.FormEvent) => {
@@ -360,6 +445,17 @@ export function Hemodinamica() {
         {/* ══ COLUNA ESQUERDA — INPUTS ══ */}
         <div className="lg:col-span-5">
           <form onSubmit={handleCalcular} className="space-y-5">
+
+            {/* Banner de importação da gasometria */}
+            <AnimatePresence>
+              {showImportBanner && (
+                <GasometriaBanner
+                  snapshot={gasometriaSnapshot!}
+                  onImport={handleImportGasometria}
+                  onDismiss={dismissBanner}
+                />
+              )}
+            </AnimatePresence>
 
             {/* Tabs de input */}
             <div className="grid grid-cols-4 p-1 bg-black/40 border border-white/5 rounded-xl gap-1">
