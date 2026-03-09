@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pill, Search, AlertCircle, Check, Plus, X, Activity, Loader2, Sparkles } from 'lucide-react';
+import { Pill, Search, AlertCircle, Check, Plus, X, Activity, Loader2, Sparkles, UserCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 
@@ -8,6 +8,7 @@ import { DRUGS, Droga } from '../constants/drogas';
 import { calcularDroga, CalculoDrogaOutput } from '../lib/clinical/drogas';
 import { checkDrugInteractions } from '../lib/services/clinicalAiService';
 import { useHistoryStore } from '../lib/storage/historyStore';
+import { useSessionStore } from '../lib/storage/sessionStore';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
@@ -52,6 +53,27 @@ export function Drogas() {
   const [currentAvaliacaoId, setCurrentAvaliacaoId] = useState<string | null>(null);
   const addAvaliacao = useHistoryStore(state => state.addAvaliacao);
   const updateAvaliacao = useHistoryStore(state => state.updateAvaliacao);
+
+  // Contexto do paciente — auto-import ao montar/mudar
+  const pacienteContext         = useSessionStore((s) => s.pacienteContext);
+  const pacienteBannerDismissed = useSessionStore((s) => s.pacienteBannerDismissed);
+  const dismissPacienteBanner   = useSessionStore((s) => s.dismissPacienteBanner);
+  const showPacienteBanner      = pacienteContext !== null && !pacienteBannerDismissed;
+
+  useEffect(() => {
+    if (!pacienteContext) return;
+    if (pacienteContext.peso != null) {
+      setInputPeso(pacienteContext.peso);
+      setPeso(pacienteContext.peso);
+    }
+    if (pacienteContext.idade != null) {
+      setInputIdade(pacienteContext.idade);
+      setIdade(pacienteContext.idade);
+      const tipoDerivado: 'Adulto' | 'Pediátrico' = pacienteContext.idade < 18 ? 'Pediátrico' : 'Adulto';
+      setInputTipo(tipoDerivado);
+      setTipo(tipoDerivado);
+    }
+  }, [pacienteContext]);
 
   const drogasFiltradas = useMemo(() => {
     return DRUGS.filter(d => 
@@ -129,6 +151,43 @@ export function Drogas() {
           <p className="text-zinc-500 text-sm font-mono mt-1">PHARMACOLOGY & DOSING ENGINE</p>
         </div>
       </div>
+
+      {/* Banner: dados do paciente importados automaticamente */}
+      <AnimatePresence>
+        {showPacienteBanner && pacienteContext && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ type: 'spring', stiffness: 280, damping: 26 }}
+            className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex items-center gap-3"
+          >
+            <div className="shrink-0 w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
+              <UserCheck className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-emerald-300 uppercase tracking-wider">
+                Dados do Paciente Importados
+              </p>
+              <p className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                {[
+                  pacienteContext.peso  != null ? `Peso: ${pacienteContext.peso} kg` : null,
+                  pacienteContext.idade != null ? `Idade: ${pacienteContext.idade} a` : null,
+                  pacienteContext.idade != null ? (pacienteContext.idade < 18 ? 'Pediátrico' : 'Adulto') : null,
+                ].filter(Boolean).join(' · ')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={dismissPacienteBanner}
+              className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-white/5 transition-colors"
+              aria-label="Dispensar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Card className="bg-black/40 border-white/5">
         <CardContent className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
