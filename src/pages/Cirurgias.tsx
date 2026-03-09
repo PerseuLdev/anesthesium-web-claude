@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { BANCO_CIRURGIAS, ESPECIALIDADES, GuiaCirurgico, Especialidade } from '../constants/cirurgias';
 import { consultarCirurgia } from '../lib/services/clinicalAiService';
+import { useSessionStore } from '../lib/storage/sessionStore';
 
 // ── Specialty icons ─────────────────────────────────────────
 const SPECIALTY_ICONS: Record<Especialidade, React.FC<{ className?: string }>> = {
@@ -82,12 +83,26 @@ function FichaCirurgica({ cirurgia, onClose }: FichaProps) {
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const pacienteContext    = useSessionStore((s) => s.pacienteContext);
+  const gasometriaSnapshot = useSessionStore((s) => s.gasometriaSnapshot);
+
   const handleAsk = async () => {
     if (!pergunta.trim() || loading) return;
     setLoading(true);
     setAiError(null);
     try {
-      const resp = await consultarCirurgia(cirurgia, pergunta.trim());
+      const pacientePayload = (pacienteContext || gasometriaSnapshot) ? {
+        peso:    pacienteContext?.peso,
+        altura:  pacienteContext?.altura,
+        idade:   pacienteContext?.idade,
+        sexo:    pacienteContext?.sexo,
+        gasometria: gasometriaSnapshot ? {
+          pH:      gasometriaSnapshot.pH,
+          PaCO2:   gasometriaSnapshot.PaCO2,
+          Lactato: gasometriaSnapshot.Lactato,
+        } : undefined,
+      } : undefined;
+      const resp = await consultarCirurgia(cirurgia, pergunta.trim(), pacientePayload);
       setAiResponse(resp);
     } catch (e) {
       setAiError('Falha na consulta à IA. Verifique a chave de API.');
