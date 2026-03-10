@@ -17,6 +17,7 @@ import { useSessionStore } from '../lib/storage/sessionStore';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { AiDisclaimer } from '../components/AiDisclaimer';
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -629,6 +630,7 @@ export function Drogas() {
                           <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-purple-500 prose-strong:text-purple-300 prose-headings:text-purple-300">
                             <Markdown>{iaSugestao}</Markdown>
                           </div>
+                          <AiDisclaimer />
                         </motion.div>
                       )}
                     </motion.div>
@@ -649,6 +651,7 @@ export function Drogas() {
                     <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-indigo-500 prose-strong:text-indigo-300">
                       <Markdown>{interacoes}</Markdown>
                     </div>
+                    <AiDisclaimer />
                   </motion.div>
                 )}
               </CardContent>

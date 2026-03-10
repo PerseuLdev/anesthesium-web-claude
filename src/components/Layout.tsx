@@ -3,6 +3,7 @@ import { Outlet, NavLink } from 'react-router-dom';
 import { Activity, Pill, ClipboardList, History, LogOut, ArrowUp, Heart, Scissors } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
+import { ConsentBanner } from './ConsentBanner';
 
 export function Layout() {
   const { t } = useTranslation();
@@ -70,6 +71,8 @@ export function Layout() {
           </motion.button>
         )}
       </AnimatePresence>
+
+      <ConsentBanner />
 
       {/* Floating Bottom Navigation */}
       <div className="fixed bottom-6 left-0 right-0 flex justify-center pointer-events-none z-50 px-4">

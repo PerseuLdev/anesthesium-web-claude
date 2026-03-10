@@ -6,6 +6,12 @@ import { GuiaCirurgico } from '../../constants/cirurgias';
 
 let ai: GoogleGenAI | null = null;
 
+/** Converte idade exata em faixa etária de 10 anos para anonimização. */
+function anonimizarIdade(idade: number): string {
+  const decada = Math.floor(idade / 10) * 10;
+  return `${decada}–${decada + 9} anos`;
+}
+
 function getAI() {
   if (!ai) {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -78,7 +84,7 @@ DADOS DA GASOMETRIA:
 - Sódio (Na): ${gasometriaData.inputOriginal.Na} mEq/L
 - Cloro (Cl): ${gasometriaData.inputOriginal.Cl} mEq/L
 - Albumina: ${gasometriaData.inputOriginal.Albumina} g/dL
-${gasometriaData.inputOriginal.Idade ? `- Idade: ${gasometriaData.inputOriginal.Idade} anos` : ''}
+${gasometriaData.inputOriginal.Idade ? `- Faixa etária: ${anonimizarIdade(gasometriaData.inputOriginal.Idade)}` : ''}
 
 INTERPRETAÇÃO AUTOMATIZADA:
 - Distúrbio Primário: ${gasometriaData.disturbioPrimario} (${gasometriaData.severidade})
@@ -145,7 +151,7 @@ ${secaoAusentes}
 ═══════════════════════════════════════
 DADOS DO PACIENTE
 ═══════════════════════════════════════
-Antropometria: ${input.peso} kg | ${input.altura} cm | ${input.idade} anos | ${input.sexo === 'M' ? 'Masculino' : 'Feminino'}
+Antropometria: ${input.peso} kg | ${input.altura} cm | Faixa: ${anonimizarIdade(input.idade)} | ${input.sexo === 'M' ? 'Masculino' : 'Feminino'}
 SC: ${hemo.sc.toFixed(2)} m² | VO2 estimado: ${hemo.vo2.toFixed(0)} mL/min
 
 SINAIS VITAIS E PRESSÕES:
@@ -230,7 +236,7 @@ CONTEXTO DO PACIENTE:
 ${[
     paciente.peso   != null ? `• Peso: ${paciente.peso} kg` : '',
     paciente.altura != null ? `• Altura: ${paciente.altura} cm` : '',
-    paciente.idade  != null ? `• Idade: ${paciente.idade} anos` : '',
+    paciente.idade  != null ? `• Faixa etária: ${anonimizarIdade(paciente.idade)}` : '',
     paciente.sexo   != null ? `• Sexo: ${paciente.sexo === 'M' ? 'Masculino' : 'Feminino'}` : '',
     paciente.gasometria ? `• Gasometria: pH ${paciente.gasometria.pH} | PaCO2 ${paciente.gasometria.PaCO2} mmHg | Lactato ${paciente.gasometria.Lactato} mmol/L` : '',
   ].filter(Boolean).join('\n')}
@@ -270,7 +276,7 @@ DADOS DO PACIENTE:
 ${[
     paciente.peso   != null ? `• Peso: ${paciente.peso} kg` : '',
     paciente.altura != null ? `• Altura: ${paciente.altura} cm` : '',
-    paciente.idade  != null ? `• Idade: ${paciente.idade} anos` : '',
+    paciente.idade  != null ? `• Faixa etária: ${anonimizarIdade(paciente.idade)}` : '',
     paciente.sexo   != null ? `• Sexo: ${paciente.sexo === 'M' ? 'Masculino' : 'Feminino'}` : '',
     paciente.gasometria ? `• Gasometria: pH ${paciente.gasometria.pH} | PaCO2 ${paciente.gasometria.PaCO2} mmHg | Lactato ${paciente.gasometria.Lactato} mmol/L` : '',
   ].filter(Boolean).join('\n')}

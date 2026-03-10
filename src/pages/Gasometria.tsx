@@ -17,6 +17,7 @@ import { useSessionStore } from '../lib/storage/sessionStore';
 import { extractGasometriaFromImage } from '../lib/services/ocrService';
 import { generateClinicalPlan } from '../lib/services/clinicalAiService';
 import { CameraScanner } from '../components/CameraScanner';
+import { AiDisclaimer } from '../components/AiDisclaimer';
 
 const schema = z.object({
   tipo: z.enum(['arterial', 'venosa']).default('arterial'),
@@ -569,6 +570,7 @@ ${resultado.causasProvaveis ? `\nCausas Prováveis: ${resultado.causasProvaveis}
                           <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-indigo-500 prose-strong:text-indigo-300">
                             <Markdown>{aiSuggestion}</Markdown>
                           </div>
+                          <AiDisclaimer />
                         </motion.div>
                       )}
                     </div>

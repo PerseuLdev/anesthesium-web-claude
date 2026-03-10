@@ -10,6 +10,7 @@ import {
 import { BANCO_CIRURGIAS, ESPECIALIDADES, GuiaCirurgico, Especialidade } from '../constants/cirurgias';
 import { consultarCirurgia } from '../lib/services/clinicalAiService';
 import { useSessionStore } from '../lib/storage/sessionStore';
+import { AiDisclaimer } from '../components/AiDisclaimer';
 
 // ── Specialty icons ─────────────────────────────────────────
 const SPECIALTY_ICONS: Record<Especialidade, React.FC<{ className?: string }>> = {
@@ -221,6 +222,9 @@ function FichaCirurgica({ cirurgia, onClose }: FichaProps) {
               </div>
               <div className="px-3 py-3 prose prose-sm prose-invert max-w-none text-zinc-300 text-sm leading-relaxed">
                 <ReactMarkdown>{aiResponse}</ReactMarkdown>
+              </div>
+              <div className="px-3 pb-3">
+                <AiDisclaimer />
               </div>
             </motion.div>
           )}

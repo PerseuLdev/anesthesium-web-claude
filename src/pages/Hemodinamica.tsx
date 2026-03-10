@@ -20,6 +20,7 @@ import {
 } from '../lib/clinical/g3pro';
 import { useHistoryStore } from '../lib/storage/historyStore';
 import { gerarInterpretacaoG3Pro } from '../lib/services/clinicalAiService';
+import { AiDisclaimer } from '../components/AiDisclaimer';
 
 // ─── Tipos de Tab ────────────────────────────────────────────
 type InputTab = 'antropometria' | 'pressoes' | 'gases' | 'eletrolitos';
@@ -953,6 +954,7 @@ export function Hemodinamica() {
                       <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-indigo-500 prose-strong:text-indigo-300 prose-headings:text-indigo-300 prose-headings:text-sm prose-h2:mt-4 prose-h2:mb-2">
                         <Markdown>{aiSuggestion}</Markdown>
                       </div>
+                      <AiDisclaimer />
                     </motion.div>
                   )}
                 </div>
