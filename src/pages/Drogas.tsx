@@ -380,9 +380,9 @@ export function Drogas() {
             </div>
             <Button
               onClick={handleConfirm}
-              className="h-12 w-full bg-cyan-500 text-black hover:bg-cyan-400 font-bold tracking-widest uppercase shadow-[0_0_20px_rgba(6,182,212,0.2)]"
+              className="col-span-2 md:col-span-1 h-16 md:h-12 w-full bg-cyan-500 text-black hover:bg-cyan-400 font-bold tracking-widest uppercase shadow-[0_0_20px_rgba(6,182,212,0.2)] whitespace-nowrap text-base md:text-sm"
             >
-              <Check className="w-4 h-4 mr-2" />
+              <Check className="w-4 h-4 mr-2 shrink-0" />
               Atualizar Doses
             </Button>
           </div>
