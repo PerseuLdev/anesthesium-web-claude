@@ -90,13 +90,19 @@ export const usePatientStore = create<PatientState>()(
         })),
 
       selectPatient: (id) => {
-        const { patients } = get();
+        const { patients, currentPatient } = get();
         const patient = patients.find((p) => p.id === id);
         if (!patient) return null;
         const restored: Patient = { ...patient, archivedAt: undefined };
+        const archivedCurrent: Patient | null = currentPatient
+          ? { ...currentPatient, archivedAt: new Date().toISOString() }
+          : null;
         set((state) => ({
           currentPatient: restored,
-          patients: state.patients.filter((p) => p.id !== id),
+          patients: [
+            ...(archivedCurrent ? [archivedCurrent] : []),
+            ...state.patients.filter((p) => p.id !== id),
+          ],
         }));
         return restored;
       },

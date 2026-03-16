@@ -329,12 +329,13 @@ function PatientCard({
 
   return (
     <div className="rounded-2xl border border-white/5 bg-zinc-900/40 overflow-hidden">
-      {/* Card header */}
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-start justify-between p-4 text-left hover:bg-white/3 transition-colors"
-      >
-        <div className="flex items-start gap-3 min-w-0">
+      {/* Card header — split into clickable info area + action buttons, NOT nested */}
+      <div className="flex items-start justify-between p-4 gap-2">
+        {/* Left: accordion toggle */}
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="flex-1 flex items-start gap-3 min-w-0 text-left"
+        >
           <div className={`p-2 rounded-xl shrink-0 ${isCurrent ? 'bg-emerald-500/20' : 'bg-zinc-800'}`}>
             <User className={`w-4 h-4 ${isCurrent ? 'text-emerald-400' : 'text-zinc-500'}`} />
           </div>
@@ -375,25 +376,31 @@ function PatientCard({
               )}
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0 ml-2">
+        </button>
+
+        {/* Right: separate action buttons (NOT inside accordion button) */}
+        <div className="flex items-center gap-2 shrink-0">
           {!isCurrent && (
-            <span
-              role="button"
-              onClick={(e) => { e.stopPropagation(); onSelectPatient(patient.id); }}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-500/15 hover:bg-violet-500/25 text-violet-400 text-[10px] font-medium transition-colors"
+            <button
+              onClick={() => onSelectPatient(patient.id)}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-500/15 hover:bg-violet-500/25 text-violet-400 text-[10px] font-medium transition-colors active:scale-95"
             >
               <UserCheck className="w-3 h-3" />
               Restaurar
-            </span>
+            </button>
           )}
-          {expanded ? (
-            <ChevronUp className="w-4 h-4 text-zinc-500" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-zinc-500" />
-          )}
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="p-1 text-zinc-500 hover:text-zinc-300 transition-colors"
+          >
+            {expanded ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+          </button>
         </div>
-      </button>
+      </div>
 
       {/* Expanded content */}
       <AnimatePresence>
