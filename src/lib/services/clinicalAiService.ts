@@ -3,6 +3,8 @@ import { GasometriaOutput } from '../clinical/gasometria';
 import { G3ProInput, G3ProResult } from '../clinical/g3pro';
 import { Droga } from '../../constants/drogas';
 import { GuiaCirurgico } from '../../constants/cirurgias';
+import type { Patient } from '../storage/patientStore';
+import type { Avaliacao } from '../storage/historyStore';
 
 let ai: GoogleGenAI | null = null;
 
@@ -392,6 +394,68 @@ Seja clínico, preciso e praticamente útil para o anestesista na sala. Apenas d
     console.error('Erro ao sugerir prescrição:', error);
     throw new Error('Falha ao comunicar com a IA para sugestão de prescrição.');
   }
+}
+
+// ── Resumo de Alta / Encerramento de Paciente ────────────────
+export async function gerarResumoAlta(
+  paciente: Patient,
+  avaliacoes: Avaliacao[]
+): Promise<string> {
+  const tiposRealizados = avaliacoes.map((a) => {
+    const data = new Date(a.data).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    let resumo = '';
+    if (a.tipo === 'Gasometria' && a.resultado?.disturbioPrimario) {
+      resumo = `${a.resultado.disturbioPrimario} (${a.resultado.severidade ?? ''})`;
+    } else if (a.tipo === 'Drogas' && a.resultado?.prescricao?.length) {
+      resumo = `${a.resultado.prescricao.length} medicamento(s)`;
+    } else if (a.tipo === 'Escores' && a.dados?.asa) {
+      resumo = `ASA ${a.dados.asa}`;
+    } else if (a.tipo === 'Hemodinamica' && a.resultado?.hemo?.choque) {
+      resumo = `Choque ${a.resultado.hemo.choque}`;
+    }
+    return `• ${a.tipo} — ${data}${resumo ? ` — ${resumo}` : ''}`;
+  });
+
+  const linhasPaciente = [
+    paciente.nome ? `• Nome: ${paciente.nome}` : '',
+    paciente.idade != null ? `• Faixa etária: ${anonimizarIdade(paciente.idade)}` : '',
+    paciente.sexo != null ? `• Sexo: ${paciente.sexo === 'M' ? 'Masculino' : 'Feminino'}` : '',
+    paciente.peso != null ? `• Peso: ${paciente.peso} kg` : '',
+    paciente.cirurgiaPlaneada ? `• Procedimento: ${paciente.cirurgiaPlaneada}` : '',
+    paciente.alergias?.length ? `• Alergias: ${paciente.alergias.join(', ')}` : '',
+  ].filter(Boolean).join('\n');
+
+  const prompt = `Você é um Anestesiologista Sênior encerrando o atendimento de um paciente e elaborando um resumo clínico para handoff.
+
+DADOS DO PACIENTE:
+${linhasPaciente || '• Não informados'}
+
+${paciente.fichaPreAnestesica ? `FICHA PRÉ-ANESTÉSICA:\n${paciente.fichaPreAnestesica}\n` : ''}
+AVALIAÇÕES REALIZADAS (${avaliacoes.length} no total):
+${tiposRealizados.join('\n') || '• Nenhuma avaliação registrada'}
+
+TAREFA: Gere um resumo de handoff/alta estruturado em Markdown para ser consultado no próximo atendimento.
+
+INSTRUÇÕES DE SAÍDA (máximo 400 palavras, sem introduções genéricas):
+
+## Perfil do Paciente
+Síntese biométrica e clínica em 2–3 linhas.
+
+## Avaliações Realizadas
+Liste os achados relevantes de cada avaliação com destaques clínicos.
+
+## Alertas Identificados
+Pontos de atenção críticos detectados durante o atendimento (via aérea, hemodinâmica, alergias, etc.). Omitir se não houver.
+
+## Recomendações para o Próximo Atendimento
+3–5 recomendações práticas baseadas no histórico deste paciente.`;
+
+  return callAI(prompt, 'gemini-3.1-flash-lite-preview');
 }
 
 // ── Ficha Pré-Anestésica ─────────────────────────────────────
