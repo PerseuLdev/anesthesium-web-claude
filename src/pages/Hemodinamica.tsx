@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Heart, Activity, AlertTriangle, Copy, Check,
@@ -326,6 +326,17 @@ export function Hemodinamica() {
   const showImportBanner   = gasometriaSnapshot !== null && !bannerDismissed;
   const setPacienteContext = useSessionStore((s) => s.setPacienteContext);
 
+  useEffect(() => {
+    if (!currentPatient) return;
+    setFormData((prev) => ({
+      ...prev,
+      peso:   currentPatient.peso   ?? prev.peso,
+      altura: currentPatient.altura ?? prev.altura,
+      idade:  currentPatient.idade  ?? prev.idade,
+      sexo:   currentPatient.sexo   ?? prev.sexo,
+    }));
+  }, [currentPatient?.id]);
+
   const handleChange = (name: keyof G3ProInput, val: number | string) => {
     setFormData((prev) => ({ ...prev, [name]: val }));
   };
@@ -468,6 +479,32 @@ export function Hemodinamica() {
                   onImport={handleImportGasometria}
                   onDismiss={dismissBanner}
                 />
+              )}
+            </AnimatePresence>
+
+            {/* Chip de paciente ativo */}
+            <AnimatePresence>
+              {currentPatient && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mb-4"
+                >
+                  <User className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-emerald-300 uppercase tracking-wider truncate">
+                      {currentPatient.nome}
+                    </p>
+                    <p className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                      {[
+                        currentPatient.idade != null ? `${currentPatient.idade} a` : null,
+                        currentPatient.peso != null ? `${currentPatient.peso} kg` : null,
+                        currentPatient.sexo ?? null,
+                      ].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                </motion.div>
               )}
             </AnimatePresence>
 
@@ -924,26 +961,27 @@ export function Hemodinamica() {
                 <div className="mt-2 pt-2">
                   {!aiSuggestion && !isGeneratingAi ? (
                     <Button
+                      variant="ai"
                       onClick={handleGenerateAi}
-                      className="w-full h-14 bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border border-indigo-500/30 tracking-widest uppercase text-sm"
+                      className="w-full h-14 tracking-widest uppercase text-sm"
                     >
                       <Sparkles className="w-4 h-4 mr-2" />
                       Gerar Interpretação Clínica Integrada (IA)
                     </Button>
                   ) : isGeneratingAi ? (
-                    <div className="flex flex-col items-center justify-center p-8 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl">
-                      <Loader2 className="w-6 h-6 text-indigo-400 animate-spin mb-3" />
-                      <p className="text-sm text-indigo-300 animate-pulse">Analisando plausibilidade clínica dos dados...</p>
+                    <div className="flex flex-col items-center justify-center p-8 bg-violet-500/5 border border-violet-500/10 rounded-2xl">
+                      <Loader2 className="w-6 h-6 text-violet-400 animate-spin mb-3" />
+                      <p className="text-sm text-violet-300 animate-pulse">Analisando plausibilidade clínica dos dados...</p>
                       <p className="text-xs text-zinc-600 mt-1">Fick + Boston + Stewart → IA Intensivista</p>
                     </div>
                   ) : (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20"
+                      className="p-5 rounded-2xl bg-violet-500/10 border border-violet-500/20"
                     >
                       <div className="flex items-center justify-between mb-4">
-                        <p className="text-[10px] text-indigo-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                        <p className="text-[10px] text-violet-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
                           <Sparkles className="w-3 h-3" />
                           Interpretação Clínica Integrada
                         </p>
@@ -951,12 +989,12 @@ export function Hemodinamica() {
                           variant="ghost"
                           size="sm"
                           onClick={handleGenerateAi}
-                          className="h-6 text-[10px] text-indigo-400 hover:text-indigo-300 px-2"
+                          className="h-6 text-[10px] text-violet-400 hover:text-violet-300 px-2"
                         >
                           Regerar
                         </Button>
                       </div>
-                      <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-indigo-500 prose-strong:text-indigo-300 prose-headings:text-indigo-300 prose-headings:text-sm prose-h2:mt-4 prose-h2:mb-2">
+                      <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-violet-500 prose-strong:text-violet-300 prose-headings:text-violet-300 prose-headings:text-sm prose-h2:mt-4 prose-h2:mb-2">
                         <Markdown>{aiSuggestion}</Markdown>
                       </div>
                       <AiDisclaimer />

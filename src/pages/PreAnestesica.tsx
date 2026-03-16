@@ -61,9 +61,9 @@ function CheckboxRow({ label, checked, onChange }: CheckboxRowProps) {
 
 export function PreAnestesica() {
   // ── Tab state ──────────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<'escores' | 'ficha' | 'medicacoes'>('escores');
+  const [activeTab, setActiveTab] = useState<'ficha' | 'medicacoes'>('ficha');
 
-  // ── TAB 1 STATE (Escores) ──────────────────────────────────────────────────
+  // ── SCORES STATE (unified — used across entire Ficha) ─────────────────────
   const [asa, setAsa] = useState(ASA_CLASSES[0]);
   const [mallampati, setMallampati] = useState(MALLAMPATI_CLASSES[0]);
   const [cormack, setCormack] = useState(CORMACK_LEHANE_CLASSES[0]);
@@ -111,42 +111,13 @@ export function PreAnestesica() {
     idadeMaior55: false,
   });
 
-  // ── TAB 2 STATE (Ficha Anestésica) ─────────────────────────────────────────
+  // ── TAB 2 STATE (Ficha Pré-Anestésica) ────────────────────────────────────
   const [fichaIdade, setFichaIdade] = useState<number | ''>('');
   const [fichaPeso, setFichaPeso] = useState<number | ''>('');
   const [fichaAltura, setFichaAltura] = useState<number | ''>('');
-  const [fichaASA, setFichaASA] = useState(ASA_CLASSES[0]);
   const [fichaEmergencia, setFichaEmergencia] = useState(false);
-  const [fichaMallampati, setFichaMallampati] = useState(MALLAMPATI_CLASSES[0]);
   const [fichaULBT, setFichaULBT] = useState(1);
-
-  const [fichaOBESE, setFichaOBESE] = useState({
-    imcMaior26: false,
-    barba: false,
-    edentulo: false,
-    roncoSaos: false,
-    idadeMaior55: false,
-  });
-
-  const [fichaLEMON, setFichaLEMON] = useState({
-    aparenciaAnormal: false,
-    regra332: false,
-    mallampatiIIIIV: false,
-    obstrucao: false,
-    cervicalLimitada: false,
-  });
-
   const [fichaMETs, setFichaMETs] = useState<'baixo' | 'alto'>('baixo');
-
-  const [fichaRCRI, setFichaRCRI] = useState({
-    cirurgiaAltoRisco: false,
-    doencaIsquemica: false,
-    insuficienciaCardiaca: false,
-    doencaCerebrovascular: false,
-    diabetesInsulina: false,
-    creatinina2: false,
-  });
-
   const [fichaARISCAT, setFichaARISCAT] = useState<number | ''>('');
   const [fichaAlergias, setFichaAlergias] = useState('');
   const [fichaAiSuggestion, setFichaAiSuggestion] = useState<string | null>(null);
@@ -162,7 +133,7 @@ export function PreAnestesica() {
   const currentPatient = usePatientStore((s) => s.currentPatient);
   const addEvaluationToPatient = usePatientStore((s) => s.addEvaluationToPatient);
 
-  // ── Computed: Tab 1 ────────────────────────────────────────────────────────
+  // ── Computed: Scores ───────────────────────────────────────────────────────
   const resApfel = calcularApfel(apfel);
   const resStopBang = calcularStopBang(stopBang);
   const resGoldman = calcularGoldman(goldman);
@@ -174,9 +145,6 @@ export function PreAnestesica() {
     fichaAltura && fichaPeso
       ? Number(fichaPeso) / Math.pow(Number(fichaAltura) / 100, 2)
       : null;
-  const fichaLemonScore = Object.values(fichaLEMON).filter(Boolean).length;
-  const fichaObeseScore = Object.values(fichaOBESE).filter(Boolean).length;
-  const fichaRCRIScore = Object.values(fichaRCRI).filter(Boolean).length;
 
   // ── Pre-populate ficha from patientStore when patient changes ─────────────
   useEffect(() => {
@@ -259,13 +227,13 @@ export function PreAnestesica() {
         peso: fichaPeso ? Number(fichaPeso) : undefined,
         altura: fichaAltura ? Number(fichaAltura) : undefined,
         imc: fichaBMI ?? undefined,
-        asaClass: fichaASA.id,
+        asaClass: asa.id,
         emergencia: fichaEmergencia,
-        mallampatiClass: fichaMallampati.id,
+        mallampatiClass: mallampati.id,
         ulbt: fichaULBT,
-        lemonScore: fichaLemonScore,
-        obeseScore: fichaObeseScore,
-        rcriScore: fichaRCRIScore,
+        lemonScore: lemonScore,
+        obeseScore: obeseScore,
+        rcriScore: resGoldman.score,
         mets: fichaMETs === 'alto' ? 5 : 3,
         ariscatScore: fichaARISCAT ? Number(fichaARISCAT) : undefined,
       };
@@ -306,15 +274,14 @@ export function PreAnestesica() {
         </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Avaliação Pré-Anestésica</h1>
-          <p className="text-slate-400 text-sm">Escores, ficha integrada e medicações perioperatórias</p>
+          <p className="text-slate-400 text-sm">Ficha unificada com escores e medicações perioperatórias</p>
         </div>
       </div>
 
       {/* Tab Navigation */}
       <div className="flex p-1 bg-black/40 border border-white/5 rounded-xl">
         {[
-          { id: 'escores', icon: ClipboardCheck, label: 'Escores' },
-          { id: 'ficha', icon: User, label: 'Ficha Anestésica' },
+          { id: 'ficha', icon: User, label: 'Ficha Pré-Anestésica' },
           { id: 'medicacoes', icon: Pill, label: 'Medicações' },
         ].map((tab) => (
           <button
@@ -332,464 +299,7 @@ export function PreAnestesica() {
         ))}
       </div>
 
-      {/* ─────────────────────────────── TAB 1: ESCORES ─────────────────────── */}
-      {activeTab === 'escores' && (
-        <motion.div
-          key="escores"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25 }}
-          className="space-y-6"
-        >
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* ASA */}
-            <Card className="border-slate-800 bg-slate-900/50">
-              <CardHeader>
-                <CardTitle className="text-blue-400">ASA Physical Status</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {ASA_CLASSES.map((classe) => (
-                  <button
-                    key={classe.id}
-                    onClick={() => setAsa(classe)}
-                    className={`w-full text-left p-4 rounded-xl border transition-all ${
-                      asa.id === classe.id
-                        ? `border-${classe.cor.split('-')[1]}-500 bg-${classe.cor.split('-')[1]}-500/10`
-                        : 'border-slate-800 hover:border-slate-700 bg-slate-800/30'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${classe.cor}`} />
-                      <div>
-                        <p className={`font-bold ${asa.id === classe.id ? 'text-white' : 'text-slate-300'}`}>
-                          ASA {classe.id}
-                        </p>
-                        <p className="text-sm text-slate-400">{classe.descricao}</p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Via Aérea */}
-            <Card className="border-slate-800 bg-slate-900/50">
-              <CardHeader>
-                <CardTitle className="text-blue-400">Avaliação de Via Aérea</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <p className="text-sm font-medium text-slate-300 mb-3">Mallampati Modificado</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {MALLAMPATI_CLASSES.map((classe) => (
-                      <button
-                        key={classe.id}
-                        onClick={() => setMallampati(classe)}
-                        className={`p-3 rounded-xl border text-left transition-all ${
-                          mallampati.id === classe.id
-                            ? 'border-blue-500 bg-blue-500/10'
-                            : 'border-slate-800 hover:border-slate-700 bg-slate-800/30'
-                        }`}
-                      >
-                        <p className={`font-bold ${mallampati.id === classe.id ? 'text-blue-400' : 'text-slate-300'}`}>
-                          Classe {classe.id}
-                        </p>
-                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">{classe.descricao}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-300 mb-3">Cormack-Lehane</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {CORMACK_LEHANE_CLASSES.map((classe) => (
-                      <button
-                        key={classe.id}
-                        onClick={() => setCormack(classe)}
-                        className={`p-3 rounded-xl border text-left transition-all ${
-                          cormack.id === classe.id
-                            ? 'border-blue-500 bg-blue-500/10'
-                            : 'border-slate-800 hover:border-slate-700 bg-slate-800/30'
-                        }`}
-                      >
-                        <p className={`font-bold ${cormack.id === classe.id ? 'text-blue-400' : 'text-slate-300'}`}>
-                          Grau {classe.id}
-                        </p>
-                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">{classe.descricao}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Apfel */}
-            <Card className="border-slate-800 bg-slate-900/50">
-              <CardHeader>
-                <CardTitle className="text-blue-400">Índice de Apfel (NVPO)</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {(
-                    [
-                      ['sexoFeminino', 'Sexo Feminino'],
-                      ['naoFumante', 'Não Fumante'],
-                      ['usoOpioides', 'Uso de Opioides Pós-op'],
-                      ['historicoNVPO', 'Histórico de NVPO/Cinetose'],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <CheckboxRow
-                      key={key}
-                      label={label}
-                      checked={apfel[key]}
-                      onChange={(v) => setApfel({ ...apfel, [key]: v })}
-                    />
-                  ))}
-                </div>
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Risco Estimado</p>
-                    <p className="text-xl font-bold text-white">{resApfel.probabilidade}%</p>
-                  </div>
-                  <div className="text-right max-w-[60%]">
-                    <p className="text-sm text-slate-300">{resApfel.recomendacao}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* STOP-BANG */}
-            <Card className="border-slate-800 bg-slate-900/50">
-              <CardHeader>
-                <CardTitle className="text-blue-400">STOP-BANG (SAOS)</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {(
-                    [
-                      ['ronco', 'Ronco alto?'],
-                      ['cansaco', 'Cansaço/fadiga?'],
-                      ['apneiaObservada', 'Apneia observada?'],
-                      ['pressaoAlta', 'Pressão alta?'],
-                      ['imcMaior35', 'IMC > 35?'],
-                      ['idadeMaior50', 'Idade > 50?'],
-                      ['circunferenciaPescoco', 'Pescoço > 40cm?'],
-                      ['sexoMasculino', 'Sexo masculino?'],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <CheckboxRow
-                      key={key}
-                      label={label}
-                      checked={stopBang[key]}
-                      onChange={(v) => setStopBang({ ...stopBang, [key]: v })}
-                    />
-                  ))}
-                </div>
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Classificação</p>
-                    <p
-                      className={`text-lg font-bold ${
-                        resStopBang.score >= 5
-                          ? 'text-rose-400'
-                          : resStopBang.score >= 3
-                          ? 'text-amber-400'
-                          : 'text-emerald-400'
-                      }`}
-                    >
-                      {resStopBang.risco}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-slate-400">Score: {resStopBang.score}/8</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Goldman RCRI */}
-            <Card className="border-slate-800 bg-slate-900/50 lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-blue-400">Índice de Risco Cardíaco Revisado (RCRI)</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {(
-                    [
-                      ['cirurgiaAltoRisco', 'Cirurgia de alto risco'],
-                      ['historiaDoencaIsquemica', 'História de doença isquêmica'],
-                      ['historiaInsuficienciaCardiaca', 'História de insuficiência cardíaca'],
-                      ['historiaDoencaCerebrovascular', 'História de doença cerebrovascular'],
-                      ['diabetesInsulinoDependente', 'Diabetes insulino-dependente'],
-                      ['creatininaMaior2', 'Creatinina > 2.0 mg/dL'],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <CheckboxRow
-                      key={key}
-                      label={label}
-                      checked={goldman[key]}
-                      onChange={(v) => setGoldman({ ...goldman, [key]: v })}
-                    />
-                  ))}
-                </div>
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Risco de Evento Cardíaco Maior (MACE)</p>
-                    <p
-                      className={`text-2xl font-bold ${
-                        resGoldman.score >= 2
-                          ? 'text-rose-400'
-                          : resGoldman.score === 1
-                          ? 'text-amber-400'
-                          : 'text-emerald-400'
-                      }`}
-                    >
-                      {resGoldman.riscoMACE}%
-                    </p>
-                  </div>
-                  <div className="text-left sm:text-right">
-                    <p className="text-sm text-slate-300 font-medium">{resGoldman.recomendacao}</p>
-                    <p className="text-xs text-slate-500 mt-1">Score: {resGoldman.score}/6</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* LEMON Score */}
-            <Card className="border-slate-800 bg-slate-900/50">
-              <CardHeader>
-                <CardTitle className="text-amber-400">Escore LEMON (Intubação Difícil)</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <CheckboxRow
-                    label="L — Aparência externa anormal"
-                    checked={lemon.aparenciaAnormal}
-                    onChange={(v) => setLemon({ ...lemon, aparenciaAnormal: v })}
-                  />
-                  <CheckboxRow
-                    label="E — Regra 3-3-2 alterada (abertura boca, espaço hio-mentão, distância tireo-mento)"
-                    checked={lemon.regra332}
-                    onChange={(v) => setLemon({ ...lemon, regra332: v })}
-                  />
-                  <CheckboxRow
-                    label="M — Mallampati III ou IV"
-                    checked={lemon.mallampatiIIIIV}
-                    onChange={(v) => setLemon({ ...lemon, mallampatiIIIIV: v })}
-                  />
-                  <CheckboxRow
-                    label="O — Obstrução de via aérea / Obesidade"
-                    checked={lemon.obstrucao}
-                    onChange={(v) => setLemon({ ...lemon, obstrucao: v })}
-                  />
-                  <CheckboxRow
-                    label="N — Mobilidade cervical reduzida"
-                    checked={lemon.cervicalLimitada}
-                    onChange={(v) => setLemon({ ...lemon, cervicalLimitada: v })}
-                  />
-                </div>
-                <div
-                  className={`p-4 rounded-xl border flex justify-between items-center ${
-                    lemonScore >= 4
-                      ? 'bg-rose-950/30 border-rose-500/30'
-                      : lemonScore >= 3
-                      ? 'bg-amber-950/30 border-amber-500/30'
-                      : 'bg-slate-950 border-slate-800'
-                  }`}
-                >
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Score LEMON</p>
-                    <p
-                      className={`text-2xl font-bold ${
-                        lemonScore >= 4 ? 'text-rose-400' : lemonScore >= 3 ? 'text-amber-400' : 'text-emerald-400'
-                      }`}
-                    >
-                      {lemonScore}/5
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p
-                      className={`text-sm font-medium ${
-                        lemonScore >= 4 ? 'text-rose-400' : lemonScore >= 3 ? 'text-amber-400' : 'text-emerald-400'
-                      }`}
-                    >
-                      {lemonScore >= 4
-                        ? 'Alto risco de intubação difícil'
-                        : lemonScore >= 3
-                        ? 'Risco moderado — atenção redobrada'
-                        : 'Baixo risco'}
-                    </p>
-                    {lemonScore >= 3 && (
-                      <p className="text-xs text-slate-400 mt-1">Considerar videolaringoscópio</p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* OBESE Score */}
-            <Card className="border-slate-800 bg-slate-900/50">
-              <CardHeader>
-                <CardTitle className="text-amber-400">Critérios OBESE (Ventilação Difícil)</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <CheckboxRow
-                    label="O — Obesidade (IMC > 26)"
-                    checked={obese.imcMaior26}
-                    onChange={(v) => setObese({ ...obese, imcMaior26: v })}
-                  />
-                  <CheckboxRow
-                    label="B — Barba presente"
-                    checked={obese.barba}
-                    onChange={(v) => setObese({ ...obese, barba: v })}
-                  />
-                  <CheckboxRow
-                    label="E — Edêntulo (sem dentes)"
-                    checked={obese.edentulo}
-                    onChange={(v) => setObese({ ...obese, edentulo: v })}
-                  />
-                  <CheckboxRow
-                    label="S — Ronco habitual / SAOS"
-                    checked={obese.roncoSaos}
-                    onChange={(v) => setObese({ ...obese, roncoSaos: v })}
-                  />
-                  <CheckboxRow
-                    label="E — Elderly (idade > 55 anos)"
-                    checked={obese.idadeMaior55}
-                    onChange={(v) => setObese({ ...obese, idadeMaior55: v })}
-                  />
-                </div>
-                <div
-                  className={`p-4 rounded-xl border flex justify-between items-center ${
-                    obeseScore >= 2
-                      ? 'bg-amber-950/30 border-amber-500/30'
-                      : 'bg-slate-950 border-slate-800'
-                  }`}
-                >
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Critérios OBESE</p>
-                    <p
-                      className={`text-2xl font-bold ${
-                        obeseScore >= 2 ? 'text-amber-400' : 'text-emerald-400'
-                      }`}
-                    >
-                      {obeseScore}/5
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p
-                      className={`text-sm font-medium ${
-                        obeseScore >= 2 ? 'text-amber-400' : 'text-emerald-400'
-                      }`}
-                    >
-                      {obeseScore >= 2 ? 'Risco aumentado de ventilação difícil' : 'Baixo risco'}
-                    </p>
-                    {obeseScore >= 2 && (
-                      <p className="text-xs text-slate-400 mt-1">Planejar máscara facial difícil</p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Summary Card */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-            <Card className="border-emerald-500/30 bg-emerald-950/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-emerald-400">
-                  <CheckCircle2 className="w-5 h-5" />
-                  Resumo Pré-operatório
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                  <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Estado Físico</p>
-                    <p className="text-lg font-bold text-white">ASA {asa.id}</p>
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Via Aérea</p>
-                    <p className="text-lg font-bold text-white">
-                      M{mallampati.id} / C{cormack.id}
-                    </p>
-                    {(['III', 'IV'].includes(mallampati.id) || ['III', 'IV'].includes(cormack.id)) && (
-                      <p className="text-xs text-rose-400 mt-1 flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" /> Via difícil
-                      </p>
-                    )}
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">LEMON</p>
-                    <p
-                      className={`text-lg font-bold ${
-                        lemonScore >= 4 ? 'text-rose-400' : lemonScore >= 3 ? 'text-amber-400' : 'text-white'
-                      }`}
-                    >
-                      {lemonScore}/5
-                    </p>
-                    {lemonScore >= 3 && (
-                      <p className="text-xs text-amber-400 mt-1 flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" /> Intubação difícil
-                      </p>
-                    )}
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">OBESE</p>
-                    <p
-                      className={`text-lg font-bold ${obeseScore >= 2 ? 'text-amber-400' : 'text-white'}`}
-                    >
-                      {obeseScore}/5
-                    </p>
-                    {obeseScore >= 2 && (
-                      <p className="text-xs text-amber-400 mt-1 flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" /> Ventilação difícil
-                      </p>
-                    )}
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Risco NVPO</p>
-                    <p className="text-lg font-bold text-white">{resApfel.probabilidade}%</p>
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Risco Cardíaco</p>
-                    <p className="text-lg font-bold text-white">{resGoldman.riscoMACE}% MACE</p>
-                  </div>
-                </div>
-
-                {/* Alert rows */}
-                {(lemonScore >= 3 || obeseScore >= 2) && (
-                  <div className="mt-4 space-y-2">
-                    {lemonScore >= 3 && (
-                      <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-950/30 border border-rose-500/20">
-                        <ShieldAlert className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-rose-300">
-                          <span className="font-semibold">LEMON {lemonScore}/5</span> — Risco{' '}
-                          {lemonScore >= 4 ? 'alto' : 'moderado'} de intubação difícil. Preparar videolaringoscópio
-                          como 1ª escolha e dispositivos de via aérea difícil.
-                        </p>
-                      </div>
-                    )}
-                    {obeseScore >= 2 && (
-                      <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-950/30 border border-amber-500/20">
-                        <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-amber-300">
-                          <span className="font-semibold">OBESE {obeseScore}/5</span> — Risco aumentado de
-                          ventilação difícil com máscara facial. Confirmar vedação e ter dispositivo
-                          supraglótico disponível.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        </motion.div>
-      )}
-
-      {/* ─────────────────────────────── TAB 2: FICHA ───────────────────────── */}
+      {/* ─────────────────────────────── TAB 1: FICHA PRÉ-ANESTÉSICA ──────── */}
       {activeTab === 'ficha' && (
         <motion.div
           key="ficha"
@@ -891,9 +401,9 @@ export function PreAnestesica() {
                 {ASA_CLASSES.map((classe) => (
                   <button
                     key={classe.id}
-                    onClick={() => setFichaASA(classe)}
+                    onClick={() => setAsa(classe)}
                     className={`p-3 rounded-xl border text-left transition-all ${
-                      fichaASA.id === classe.id
+                      asa.id === classe.id
                         ? `border-${classe.cor.split('-')[1]}-500 bg-${classe.cor.split('-')[1]}-500/10`
                         : 'border-slate-800 hover:border-slate-700 bg-slate-800/30'
                     }`}
@@ -902,7 +412,7 @@ export function PreAnestesica() {
                       <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${classe.cor}`} />
                       <p
                         className={`font-bold text-sm ${
-                          fichaASA.id === classe.id ? 'text-white' : 'text-slate-300'
+                          asa.id === classe.id ? 'text-white' : 'text-slate-300'
                         }`}
                       >
                         ASA {classe.id}
@@ -920,9 +430,38 @@ export function PreAnestesica() {
                   className="w-5 h-5 rounded border-slate-600 text-rose-500 focus:ring-rose-500 focus:ring-offset-slate-900 bg-slate-900"
                 />
                 <span className="text-sm font-semibold text-rose-300">
-                  Cirurgia de Emergência (ASA {fichaASA.id}E)
+                  Cirurgia de Emergência (ASA {asa.id}E)
                 </span>
               </label>
+
+              {/* Apfel — Risco NVPO */}
+              <div>
+                <p className="text-sm font-medium text-slate-300 mb-3">
+                  Risco NVPO{' '}
+                  <span className="text-xs text-slate-500">(Índice de Apfel)</span>
+                </p>
+                <div className="space-y-3">
+                  {(
+                    [
+                      ['sexoFeminino', 'Sexo Feminino'],
+                      ['naoFumante', 'Não Fumante'],
+                      ['usoOpioides', 'Uso de Opioides Pós-op'],
+                      ['historicoNVPO', 'Histórico de NVPO/Cinetose'],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <CheckboxRow
+                      key={key}
+                      label={label}
+                      checked={apfel[key]}
+                      onChange={(v) => setApfel({ ...apfel, [key]: v })}
+                    />
+                  ))}
+                </div>
+                <div className="mt-3 p-3 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
+                  <span className="text-xs text-slate-500 uppercase tracking-wider">Risco NVPO</span>
+                  <span className="font-bold font-mono text-lg text-white">{resApfel.probabilidade}%</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -939,16 +478,16 @@ export function PreAnestesica() {
                   {MALLAMPATI_CLASSES.map((classe) => (
                     <button
                       key={classe.id}
-                      onClick={() => setFichaMallampati(classe)}
+                      onClick={() => setMallampati(classe)}
                       className={`p-3 rounded-xl border text-left transition-all ${
-                        fichaMallampati.id === classe.id
+                        mallampati.id === classe.id
                           ? 'border-blue-500 bg-blue-500/10'
                           : 'border-slate-800 hover:border-slate-700 bg-slate-800/30'
                       }`}
                     >
                       <p
                         className={`font-bold text-sm ${
-                          fichaMallampati.id === classe.id ? 'text-blue-400' : 'text-slate-300'
+                          mallampati.id === classe.id ? 'text-blue-400' : 'text-slate-300'
                         }`}
                       >
                         Classe {classe.id}
@@ -1008,31 +547,31 @@ export function PreAnestesica() {
                   Critérios OBESE{' '}
                   <span className="text-xs text-slate-500">(ventilação difícil com máscara)</span>
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="space-y-3">
                   <CheckboxRow
                     label="O — Obesidade (IMC > 26)"
-                    checked={fichaOBESE.imcMaior26}
-                    onChange={(v) => setFichaOBESE({ ...fichaOBESE, imcMaior26: v })}
+                    checked={obese.imcMaior26}
+                    onChange={(v) => setObese({ ...obese, imcMaior26: v })}
                   />
                   <CheckboxRow
                     label="B — Barba presente"
-                    checked={fichaOBESE.barba}
-                    onChange={(v) => setFichaOBESE({ ...fichaOBESE, barba: v })}
+                    checked={obese.barba}
+                    onChange={(v) => setObese({ ...obese, barba: v })}
                   />
                   <CheckboxRow
                     label="E — Edêntulo (sem dentes)"
-                    checked={fichaOBESE.edentulo}
-                    onChange={(v) => setFichaOBESE({ ...fichaOBESE, edentulo: v })}
+                    checked={obese.edentulo}
+                    onChange={(v) => setObese({ ...obese, edentulo: v })}
                   />
                   <CheckboxRow
                     label="S — Ronco habitual / SAOS"
-                    checked={fichaOBESE.roncoSaos}
-                    onChange={(v) => setFichaOBESE({ ...fichaOBESE, roncoSaos: v })}
+                    checked={obese.roncoSaos}
+                    onChange={(v) => setObese({ ...obese, roncoSaos: v })}
                   />
                   <CheckboxRow
                     label="E — Elderly (idade > 55 anos)"
-                    checked={fichaOBESE.idadeMaior55}
-                    onChange={(v) => setFichaOBESE({ ...fichaOBESE, idadeMaior55: v })}
+                    checked={obese.idadeMaior55}
+                    onChange={(v) => setObese({ ...obese, idadeMaior55: v })}
                   />
                 </div>
               </div>
@@ -1043,38 +582,81 @@ export function PreAnestesica() {
                   Escore LEMON{' '}
                   <span className="text-xs text-slate-500">(intubação difícil)</span>
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="space-y-3">
                   <CheckboxRow
                     label="L — Aparência externa anormal"
-                    checked={fichaLEMON.aparenciaAnormal}
-                    onChange={(v) => setFichaLEMON({ ...fichaLEMON, aparenciaAnormal: v })}
+                    checked={lemon.aparenciaAnormal}
+                    onChange={(v) => setLemon({ ...lemon, aparenciaAnormal: v })}
                   />
                   <CheckboxRow
                     label="E — Regra 3-3-2 alterada"
-                    checked={fichaLEMON.regra332}
-                    onChange={(v) => setFichaLEMON({ ...fichaLEMON, regra332: v })}
+                    checked={lemon.regra332}
+                    onChange={(v) => setLemon({ ...lemon, regra332: v })}
                   />
                   <CheckboxRow
                     label="M — Mallampati III ou IV"
-                    checked={fichaLEMON.mallampatiIIIIV}
-                    onChange={(v) => setFichaLEMON({ ...fichaLEMON, mallampatiIIIIV: v })}
+                    checked={lemon.mallampatiIIIIV}
+                    onChange={(v) => setLemon({ ...lemon, mallampatiIIIIV: v })}
                   />
                   <CheckboxRow
                     label="O — Obstrução de via aérea / Obesidade"
-                    checked={fichaLEMON.obstrucao}
-                    onChange={(v) => setFichaLEMON({ ...fichaLEMON, obstrucao: v })}
+                    checked={lemon.obstrucao}
+                    onChange={(v) => setLemon({ ...lemon, obstrucao: v })}
                   />
                   <CheckboxRow
                     label="N — Mobilidade cervical reduzida"
-                    checked={fichaLEMON.cervicalLimitada}
-                    onChange={(v) => setFichaLEMON({ ...fichaLEMON, cervicalLimitada: v })}
+                    checked={lemon.cervicalLimitada}
+                    onChange={(v) => setLemon({ ...lemon, cervicalLimitada: v })}
                   />
+                </div>
+              </div>
+
+              {/* STOP-BANG — Rastreio SAOS */}
+              <div>
+                <p className="text-sm font-medium text-slate-300 mb-3">
+                  Rastreio SAOS{' '}
+                  <span className="text-xs text-slate-500">(STOP-BANG)</span>
+                </p>
+                <div className="space-y-3">
+                  {(
+                    [
+                      ['ronco', 'Ronco alto?'],
+                      ['cansaco', 'Cansaço/fadiga diurna?'],
+                      ['apneiaObservada', 'Apneia observada?'],
+                      ['pressaoAlta', 'Pressão alta?'],
+                      ['imcMaior35', 'IMC > 35?'],
+                      ['idadeMaior50', 'Idade > 50?'],
+                      ['circunferenciaPescoco', 'Pescoço > 40cm?'],
+                      ['sexoMasculino', 'Sexo masculino?'],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <CheckboxRow
+                      key={key}
+                      label={label}
+                      checked={stopBang[key]}
+                      onChange={(v) => setStopBang({ ...stopBang, [key]: v })}
+                    />
+                  ))}
+                </div>
+                <div className="mt-3 p-3 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
+                  <span className="text-xs text-slate-500 uppercase tracking-wider">STOP-BANG</span>
+                  <span
+                    className={`font-bold font-mono text-lg ${
+                      resStopBang.score >= 5
+                        ? 'text-rose-400'
+                        : resStopBang.score >= 3
+                        ? 'text-amber-400'
+                        : 'text-emerald-400'
+                    }`}
+                  >
+                    {resStopBang.score}/8 — {resStopBang.risco}
+                  </span>
                 </div>
               </div>
 
               {/* Via aérea inline alerts */}
               <AnimatePresence>
-                {fichaLemonScore >= 3 && (
+                {lemonScore >= 3 && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
@@ -1083,12 +665,12 @@ export function PreAnestesica() {
                   >
                     <ShieldAlert className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-rose-300">
-                      <span className="font-semibold">LEMON {fichaLemonScore}/5</span> — Videolaringoscópio
+                      <span className="font-semibold">LEMON {lemonScore}/5</span> — Videolaringoscópio
                       como 1ª escolha. Planejar via aérea difícil.
                     </p>
                   </motion.div>
                 )}
-                {fichaObeseScore >= 2 && (
+                {obeseScore >= 2 && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
@@ -1097,7 +679,7 @@ export function PreAnestesica() {
                   >
                     <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-amber-300">
-                      <span className="font-semibold">OBESE {fichaObeseScore}/5</span> — Risco aumentado de
+                      <span className="font-semibold">OBESE {obeseScore}/5</span> — Risco aumentado de
                       ventilação difícil com máscara facial.
                     </p>
                   </motion.div>
@@ -1164,40 +746,40 @@ export function PreAnestesica() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <CheckboxRow
                     label="Cirurgia de alto risco"
-                    checked={fichaRCRI.cirurgiaAltoRisco}
-                    onChange={(v) => setFichaRCRI({ ...fichaRCRI, cirurgiaAltoRisco: v })}
+                    checked={goldman.cirurgiaAltoRisco}
+                    onChange={(v) => setGoldman({ ...goldman, cirurgiaAltoRisco: v })}
                   />
                   <CheckboxRow
                     label="Doença isquêmica cardíaca"
-                    checked={fichaRCRI.doencaIsquemica}
-                    onChange={(v) => setFichaRCRI({ ...fichaRCRI, doencaIsquemica: v })}
+                    checked={goldman.historiaDoencaIsquemica}
+                    onChange={(v) => setGoldman({ ...goldman, historiaDoencaIsquemica: v })}
                   />
                   <CheckboxRow
                     label="Insuficiência cardíaca congestiva"
-                    checked={fichaRCRI.insuficienciaCardiaca}
-                    onChange={(v) => setFichaRCRI({ ...fichaRCRI, insuficienciaCardiaca: v })}
+                    checked={goldman.historiaInsuficienciaCardiaca}
+                    onChange={(v) => setGoldman({ ...goldman, historiaInsuficienciaCardiaca: v })}
                   />
                   <CheckboxRow
                     label="Doença cerebrovascular (AVC/AIT)"
-                    checked={fichaRCRI.doencaCerebrovascular}
-                    onChange={(v) => setFichaRCRI({ ...fichaRCRI, doencaCerebrovascular: v })}
+                    checked={goldman.historiaDoencaCerebrovascular}
+                    onChange={(v) => setGoldman({ ...goldman, historiaDoencaCerebrovascular: v })}
                   />
                   <CheckboxRow
                     label="Diabetes insulino-dependente"
-                    checked={fichaRCRI.diabetesInsulina}
-                    onChange={(v) => setFichaRCRI({ ...fichaRCRI, diabetesInsulina: v })}
+                    checked={goldman.diabetesInsulinoDependente}
+                    onChange={(v) => setGoldman({ ...goldman, diabetesInsulinoDependente: v })}
                   />
                   <CheckboxRow
                     label="Creatinina > 2.0 mg/dL"
-                    checked={fichaRCRI.creatinina2}
-                    onChange={(v) => setFichaRCRI({ ...fichaRCRI, creatinina2: v })}
+                    checked={goldman.creatininaMaior2}
+                    onChange={(v) => setGoldman({ ...goldman, creatininaMaior2: v })}
                   />
                 </div>
                 <div
                   className={`mt-3 p-3 rounded-xl border flex justify-between items-center ${
-                    fichaRCRIScore >= 3
+                    resGoldman.score >= 3
                       ? 'bg-rose-950/30 border-rose-500/30'
-                      : fichaRCRIScore >= 1
+                      : resGoldman.score >= 1
                       ? 'bg-amber-950/30 border-amber-500/30'
                       : 'bg-slate-950 border-slate-800'
                   }`}
@@ -1205,14 +787,14 @@ export function PreAnestesica() {
                   <span className="text-xs text-slate-400 uppercase tracking-wider">RCRI Score</span>
                   <span
                     className={`font-bold font-mono text-lg ${
-                      fichaRCRIScore >= 3
+                      resGoldman.score >= 3
                         ? 'text-rose-400'
-                        : fichaRCRIScore >= 1
+                        : resGoldman.score >= 1
                         ? 'text-amber-400'
                         : 'text-emerald-400'
                     }`}
                   >
-                    {fichaRCRIScore}/6
+                    {resGoldman.score}/6
                   </span>
                 </div>
               </div>
@@ -1255,70 +837,104 @@ export function PreAnestesica() {
           </Card>
 
           {/* Risk Summary Panel */}
-          <Card className="border-blue-500/20 bg-blue-950/10">
-            <CardHeader>
-              <CardTitle className="text-blue-400 flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5" />
-                Resumo da Ficha
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
-                  <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">ASA</p>
-                  <p className="font-bold text-white">
-                    {fichaASA.id}
-                    {fichaEmergencia ? 'E' : ''}
-                  </p>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <Card className="border-emerald-500/30 bg-emerald-950/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-emerald-400">
+                  <CheckCircle2 className="w-5 h-5" />
+                  Resumo Pré-operatório
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Estado Físico</p>
+                    <p className="text-lg font-bold text-white">
+                      ASA {asa.id}{fichaEmergencia ? 'E' : ''}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Via Aérea</p>
+                    <p className="text-lg font-bold text-white">
+                      M{mallampati.id} / C{cormack.id}
+                    </p>
+                    {(['III', 'IV'].includes(mallampati.id) || ['III', 'IV'].includes(cormack.id)) && (
+                      <p className="text-xs text-rose-400 mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Via difícil
+                      </p>
+                    )}
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">LEMON</p>
+                    <p
+                      className={`text-lg font-bold ${
+                        lemonScore >= 4 ? 'text-rose-400' : lemonScore >= 3 ? 'text-amber-400' : 'text-white'
+                      }`}
+                    >
+                      {lemonScore}/5
+                    </p>
+                    {lemonScore >= 3 && (
+                      <p className="text-xs text-amber-400 mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Intubação difícil
+                      </p>
+                    )}
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">OBESE</p>
+                    <p
+                      className={`text-lg font-bold ${obeseScore >= 2 ? 'text-amber-400' : 'text-white'}`}
+                    >
+                      {obeseScore}/5
+                    </p>
+                    {obeseScore >= 2 && (
+                      <p className="text-xs text-amber-400 mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Ventilação difícil
+                      </p>
+                    )}
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Risco NVPO</p>
+                    <p className="text-lg font-bold text-white">{resApfel.probabilidade}%</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Risco Cardíaco</p>
+                    <p className="text-lg font-bold text-white">{resGoldman.riscoMACE}% MACE</p>
+                  </div>
                 </div>
-                <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
-                  <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">LEMON</p>
-                  <p
-                    className={`font-bold ${
-                      fichaLemonScore >= 4
-                        ? 'text-rose-400'
-                        : fichaLemonScore >= 3
-                        ? 'text-amber-400'
-                        : 'text-white'
-                    }`}
-                  >
-                    {fichaLemonScore}/5
-                  </p>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
-                  <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">OBESE</p>
-                  <p className={`font-bold ${fichaObeseScore >= 2 ? 'text-amber-400' : 'text-white'}`}>
-                    {fichaObeseScore}/5
-                  </p>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
-                  <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">RCRI</p>
-                  <p
-                    className={`font-bold ${
-                      fichaRCRIScore >= 3
-                        ? 'text-rose-400'
-                        : fichaRCRIScore >= 1
-                        ? 'text-amber-400'
-                        : 'text-white'
-                    }`}
-                  >
-                    {fichaRCRIScore}/6
-                  </p>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800">
-                  <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">METs</p>
-                  <p className={`font-bold ${fichaMETs === 'baixo' ? 'text-amber-400' : 'text-emerald-400'}`}>
-                    {fichaMETs === 'baixo' ? '≤ 4' : '> 4'}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+
+                {/* Alert rows */}
+                {(lemonScore >= 3 || obeseScore >= 2) && (
+                  <div className="mt-4 space-y-2">
+                    {lemonScore >= 3 && (
+                      <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-950/30 border border-rose-500/20">
+                        <ShieldAlert className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-rose-300">
+                          <span className="font-semibold">LEMON {lemonScore}/5</span> — Risco{' '}
+                          {lemonScore >= 4 ? 'alto' : 'moderado'} de intubação difícil. Preparar videolaringoscópio
+                          como 1ª escolha e dispositivos de via aérea difícil.
+                        </p>
+                      </div>
+                    )}
+                    {obeseScore >= 2 && (
+                      <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-950/30 border border-amber-500/20">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-amber-300">
+                          <span className="font-semibold">OBESE {obeseScore}/5</span> — Risco aumentado de
+                          ventilação difícil com máscara facial. Confirmar vedação e ter dispositivo
+                          supraglótico disponível.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
 
           {/* AI Synthesis */}
           <Card className="border-slate-800 bg-slate-900/50">
             <CardHeader>
-              <CardTitle className="text-purple-400 flex items-center gap-2">
+              <CardTitle className="text-violet-400 flex items-center gap-2">
                 <Sparkles className="w-5 h-5" />
                 Síntese com IA
               </CardTitle>
@@ -1330,8 +946,8 @@ export function PreAnestesica() {
               <Button
                 onClick={handleGerarFicha}
                 disabled={isGeneratingAi}
-                className="w-full bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30"
-                variant="outline"
+                className="w-full"
+                variant="ai"
               >
                 {isGeneratingAi ? (
                   <>
@@ -1352,7 +968,7 @@ export function PreAnestesica() {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="p-4 rounded-xl bg-slate-950 border border-slate-700 prose prose-invert prose-sm max-w-none"
+                    className="p-4 rounded-xl bg-slate-950 border border-violet-700/40 prose prose-invert prose-sm max-w-none"
                   >
                     <Markdown>{fichaAiSuggestion}</Markdown>
                   </motion.div>
@@ -1363,7 +979,7 @@ export function PreAnestesica() {
         </motion.div>
       )}
 
-      {/* ─────────────────────────────── TAB 3: MEDICAÇÕES ─────────────────── */}
+      {/* ─────────────────────────────── TAB 2: MEDICAÇÕES ─────────────────── */}
       {activeTab === 'medicacoes' && (
         <motion.div
           key="medicacoes"

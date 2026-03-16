@@ -18,14 +18,20 @@ import { Cirurgias } from './pages/Cirurgias';
 import { Paciente } from './pages/Paciente';
 import { NovoPatiente } from './pages/NovoPatiente';
 import { EditarPaciente } from './pages/EditarPaciente';
+import { usePatientStore } from './lib/storage/patientStore';
 import './lib/i18n'; // Initialize i18n
+
+function IndexRedirect() {
+  const currentPatient = usePatientStore((s) => s.currentPatient);
+  return <Navigate to={currentPatient ? '/paciente' : '/paciente/novo'} replace />;
+}
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Gasometria />} />
+          <Route index element={<IndexRedirect />} />
           <Route path="gasometria" element={<Gasometria />} />
           <Route path="drogas" element={<Drogas />} />
           <Route path="escores" element={<Navigate to="/pre-anestesica" replace />} />

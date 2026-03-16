@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { motion, AnimatePresence } from 'motion/react';
-import { Activity, FileText, Save, Droplet, AlertTriangle, Copy, Check, Camera, Loader2, Sparkles } from 'lucide-react';
+import { Activity, FileText, Save, Droplet, AlertTriangle, Copy, Check, Camera, Loader2, Sparkles, User } from 'lucide-react';
 import Markdown from 'react-markdown';
 
 import { Input } from '../components/ui/Input';
@@ -113,6 +113,13 @@ export function Gasometria() {
       setGasometriaDraft(draftRef.current.formValues as Partial<GasometriaInput>, draftRef.current.resultado, draftRef.current.aiSuggestion);
     };
   }, [setGasometriaDraft]);
+
+  // Pre-fill Idade when patient context changes
+  useEffect(() => {
+    if (currentPatient?.idade != null) {
+      setValue('Idade', currentPatient.idade);
+    }
+  }, [currentPatient?.id, setValue]);
 
   const onSubmit = (data: any) => {
     const calcData = { ...data, FiO2: data.FiO2 ? data.FiO2 / 100 : 0.21 };
@@ -250,6 +257,32 @@ ${resultado.causasProvaveis ? `\nCausas Prováveis: ${resultado.causasProvaveis}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-7">
           <form id="gaso-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+
+            {/* Patient Context Chip */}
+            <AnimatePresence>
+              {currentPatient && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mb-4"
+                >
+                  <User className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-emerald-300 uppercase tracking-wider truncate">
+                      {currentPatient.nome}
+                    </p>
+                    <p className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                      {[
+                        currentPatient.idade != null ? `${currentPatient.idade} a` : null,
+                        currentPatient.peso != null ? `${currentPatient.peso} kg` : null,
+                        currentPatient.sexo ?? null,
+                      ].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Paired Sample Warning */}
             <AnimatePresence>
@@ -581,34 +614,35 @@ ${resultado.causasProvaveis ? `\nCausas Prováveis: ${resultado.causasProvaveis}
                     {/* AI Suggestion Section */}
                     <div className="mt-6 pt-6 border-t border-white/5">
                       {!aiSuggestion && !isGeneratingAi ? (
-                        <Button 
-                          onClick={handleGenerateAiPlan} 
-                          className="w-full bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border border-indigo-500/30"
+                        <Button
+                          variant="ai"
+                          onClick={handleGenerateAiPlan}
+                          className="w-full"
                         >
                           <Sparkles className="w-4 h-4 mr-2" />
                           Gerar Conduta com IA
                         </Button>
                       ) : isGeneratingAi ? (
-                        <div className="flex flex-col items-center justify-center p-6 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl">
-                          <Loader2 className="w-6 h-6 text-indigo-400 animate-spin mb-3" />
-                          <p className="text-sm text-indigo-300 animate-pulse">Analisando parâmetros clínicos...</p>
+                        <div className="flex flex-col items-center justify-center p-6 bg-violet-500/5 border border-violet-500/10 rounded-2xl">
+                          <Loader2 className="w-6 h-6 text-violet-400 animate-spin mb-3" />
+                          <p className="text-sm text-violet-300 animate-pulse">Analisando parâmetros clínicos...</p>
                         </div>
                       ) : (
-                        <motion.div 
+                        <motion.div
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20"
+                          className="p-5 rounded-2xl bg-violet-500/10 border border-violet-500/20"
                         >
                           <div className="flex items-center justify-between mb-4">
-                            <p className="text-[10px] text-indigo-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                            <p className="text-[10px] text-violet-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
                               <Sparkles className="w-3 h-3" />
                               Plano Terapêutico Sugerido
                             </p>
-                            <Button variant="ghost" size="sm" onClick={handleGenerateAiPlan} className="h-6 text-[10px] text-indigo-400 hover:text-indigo-300 px-2">
+                            <Button variant="ghost" size="sm" onClick={handleGenerateAiPlan} className="h-6 text-[10px] text-violet-400 hover:text-violet-300 px-2">
                               Regerar
                             </Button>
                           </div>
-                          <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-indigo-500 prose-strong:text-indigo-300">
+                          <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-violet-500 prose-strong:text-violet-300">
                             <Markdown>{aiSuggestion}</Markdown>
                           </div>
                           <AiDisclaimer />

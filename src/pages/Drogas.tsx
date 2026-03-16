@@ -505,16 +505,17 @@ export function Drogas() {
           <select
             value={cenarioPrescricao}
             onChange={e => { setCenarioPrescricao(e.target.value); setSugestaoPrescrição(null); }}
-            className="flex-1 h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-zinc-200 text-sm focus:outline-none focus:border-purple-500/50 transition-colors"
+            className="flex-1 h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-zinc-200 text-sm focus:outline-none focus:border-violet-500/50 transition-colors"
           >
             {['Centro Cirúrgico', 'UTI', 'Emergência / Pronto-Socorro', 'Procedimento Ambulatorial', 'Sedação Diagnóstica'].map(c => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
           <Button
+            variant="ai"
             onClick={handleSugerirPrescricao}
             disabled={isSugerindoPrescricao}
-            className="h-10 bg-purple-600 hover:bg-purple-500 text-white shrink-0"
+            className="h-10 shrink-0"
           >
             {isSugerindoPrescricao ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -527,13 +528,13 @@ export function Drogas() {
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-4 rounded-2xl bg-black/40 border border-purple-500/20 space-y-3"
+            className="p-4 rounded-2xl bg-black/40 border border-violet-500/20 space-y-3"
           >
-            <p className="text-[10px] text-purple-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+            <p className="text-[10px] text-violet-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
               <Brain className="w-3 h-3" />
               Sugestão de Prescrição — {cenarioPrescricao}
             </p>
-            <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-purple-500 prose-strong:text-purple-300 prose-headings:text-purple-300">
+            <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-violet-500 prose-strong:text-violet-300 prose-headings:text-violet-300">
               <Markdown>{sugestaoPrescrição}</Markdown>
             </div>
             <AiDisclaimer />
@@ -552,7 +553,7 @@ export function Drogas() {
                     });
                     setShowChecklist(true);
                   }}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-sm font-semibold transition-all"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/30 text-violet-300 text-sm font-semibold transition-all"
                 >
                   <Plus className="w-4 h-4" />
                   Adicionar à PM ({sugeridas.length} droga{sugeridas.length !== 1 ? 's' : ''})
@@ -987,9 +988,10 @@ export function Drogas() {
                     {prescricao.length >= 2 && (
                       <div className="space-y-2">
                         <Button
+                          variant="ai"
                           onClick={handleCheckInteractions}
                           disabled={isCheckingInteractions}
-                          className="w-full bg-indigo-600 text-white hover:bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.2)]"
+                          className="w-full shadow-[0_0_15px_rgba(139,92,246,0.2)]"
                         >
                           {isCheckingInteractions ? (
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1002,13 +1004,13 @@ export function Drogas() {
                           <motion.div
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="p-4 rounded-2xl bg-black/40 border border-indigo-500/20"
+                            className="p-4 rounded-2xl bg-black/40 border border-violet-500/20"
                           >
-                            <p className="text-[10px] text-indigo-400 uppercase tracking-widest font-bold flex items-center gap-1.5 mb-3">
+                            <p className="text-[10px] text-violet-400 uppercase tracking-widest font-bold flex items-center gap-1.5 mb-3">
                               <Sparkles className="w-3 h-3" />
                               Análise de Interações (IA)
                             </p>
-                            <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-indigo-500 prose-strong:text-indigo-300">
+                            <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-violet-500 prose-strong:text-violet-300">
                               <Markdown>{interacoes}</Markdown>
                             </div>
                             <AiDisclaimer />
@@ -1022,13 +1024,13 @@ export function Drogas() {
                       <motion.div
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="p-4 rounded-2xl bg-black/40 border border-purple-500/20 space-y-3"
+                        className="p-4 rounded-2xl bg-black/40 border border-violet-500/20 space-y-3"
                       >
-                        <p className="text-[10px] text-purple-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                        <p className="text-[10px] text-violet-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
                           <Brain className="w-3 h-3" />
                           Sugestão — {cenarioPrescricao}
                         </p>
-                        <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-purple-500 prose-strong:text-purple-300 prose-headings:text-purple-300">
+                        <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-violet-500 prose-strong:text-violet-300 prose-headings:text-violet-300">
                           <Markdown>{sugestaoPrescrição}</Markdown>
                         </div>
                         <AiDisclaimer />
