@@ -345,6 +345,55 @@ Se não houver interações relevantes conhecidas, informe claramente que não h
   }
 }
 
+// ── Sugestão de Prescrição por Cenário ───────────────────────
+export async function sugerirPrescricao(
+  paciente: { peso?: number; idade?: number; sexo?: 'M' | 'F'; alergias?: string[] },
+  cenario: string
+): Promise<string> {
+  const linhasPaciente = [
+    paciente.idade  != null ? `• Faixa etária: ${anonimizarIdade(paciente.idade)}` : '',
+    paciente.sexo   != null ? `• Sexo: ${paciente.sexo === 'M' ? 'Masculino' : 'Feminino'}` : '',
+    paciente.peso   != null ? `• Peso: ${paciente.peso} kg` : '',
+    paciente.alergias && paciente.alergias.length > 0 ? `• Alergias conhecidas: ${paciente.alergias.join(', ')}` : '• Sem alergias registradas',
+  ].filter(Boolean).join('\n');
+
+  const prompt = `Você é um Anestesiologista Sênior montando uma prescrição para o seguinte cenário.
+
+CENÁRIO: ${cenario}
+
+DADOS DO PACIENTE:
+${linhasPaciente || '• Não informados — use referências para adulto padrão (70 kg).'}
+
+TAREFA: Sugira uma prescrição anestésica/sedação personalizada e prática para este contexto.
+
+INSTRUÇÕES DE SAÍDA (Markdown, direto, máximo 400 palavras, sem introduções genéricas):
+
+## Protocolo Recomendado
+Nome e justificativa em 1–2 frases considerando o cenário específico.
+
+## Medicamentos e Doses
+Para cada droga:
+- **Nome exato:** (ex: Propofol, Fentanil, Rocurônio — use nomes sem abreviações)
+- Dose de bolus calculada para o peso e dose/kg se peso não disponível
+- Dose de infusão em mL/h quando aplicável
+- Concentração padrão de preparo
+
+## Alertas do Protocolo
+Cuidados específicos para este cenário (via aérea, hemodinâmica, monitorização, recuperação).
+
+## Sequência de Administração
+Ordem e tempo sugeridos para as medicações (ex: pré-medicação → indução → manutenção).
+
+Seja clínico, preciso e praticamente útil para o anestesista na sala. Apenas drogas relevantes para o cenário.`;
+
+  try {
+    return await callAI(prompt, 'gemini-3.1-flash-lite-preview');
+  } catch (error) {
+    console.error('Erro ao sugerir prescrição:', error);
+    throw new Error('Falha ao comunicar com a IA para sugestão de prescrição.');
+  }
+}
+
 // ── Ficha Pré-Anestésica ─────────────────────────────────────
 export interface DadosFichaAnestesica {
   // Biometria
