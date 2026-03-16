@@ -4,6 +4,7 @@ import {
   UserRound,
   UserPlus,
   UserMinus,
+  UserPen,
   Activity,
   Pill,
   ClipboardCheck,
@@ -127,11 +128,20 @@ export function Paciente() {
             {/* Patient info card */}
             <div className="p-5 rounded-2xl border border-violet-500/20 bg-violet-500/5 space-y-4">
               {/* Nome + meta chips */}
-              <div>
-                <p className="text-xl font-bold text-white tracking-tight">{currentPatient.nome}</p>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  Cadastrado em {format(new Date(currentPatient.createdAt), "dd/MM/yyyy 'às' HH:mm")}
-                </p>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xl font-bold text-white tracking-tight">{currentPatient.nome}</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Cadastrado em {format(new Date(currentPatient.createdAt), "dd/MM/yyyy 'às' HH:mm")}
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigate('/paciente/editar')}
+                  className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white text-xs font-medium transition-colors active:scale-95"
+                >
+                  <UserPen className="w-3.5 h-3.5" />
+                  Editar
+                </button>
               </div>
 
               <div className="flex flex-wrap gap-2">

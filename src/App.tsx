@@ -17,6 +17,7 @@ import { Hemodinamica } from './pages/Hemodinamica';
 import { Cirurgias } from './pages/Cirurgias';
 import { Paciente } from './pages/Paciente';
 import { NovoPatiente } from './pages/NovoPatiente';
+import { EditarPaciente } from './pages/EditarPaciente';
 import './lib/i18n'; // Initialize i18n
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="cirurgias" element={<Cirurgias />} />
           <Route path="paciente" element={<Paciente />} />
           <Route path="paciente/novo" element={<NovoPatiente />} />
+          <Route path="paciente/editar" element={<EditarPaciente />} />
         </Route>
       </Routes>
     </BrowserRouter>
