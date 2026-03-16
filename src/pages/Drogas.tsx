@@ -2,9 +2,10 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Pill, Search, AlertCircle, Check, Plus, X, Activity, Loader2,
-  Sparkles, UserCheck, FlaskConical, ChevronRight, Zap, Brain,
-  Heart, Shield, Syringe, Droplets, RotateCcw, Calculator,
+  Sparkles, UserCheck, FlaskConical, Zap, Brain,
+  Heart, Shield, Syringe, Droplets, RotateCcw,
   ArrowLeftRight, User, ChevronDown, TriangleAlert,
+  ShoppingCart, Trash2, Minus,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
@@ -12,12 +13,13 @@ import Markdown from 'react-markdown';
 import { DRUGS, Droga, PROTOCOLOS_SEDACAO, ProtocoloSedacao } from '../constants/drogas';
 import { calcularDroga } from '../lib/clinical/drogas';
 import { calcularIBW, calcularABW, calcularIMC, calcularVolumeCorrente } from '../lib/clinical/calculadoras';
-import { checkDrugInteractions, sugerirProtocoloSedacao } from '../lib/services/clinicalAiService';
+import { checkDrugInteractions, sugerirPrescricao } from '../lib/services/clinicalAiService';
+import { detectarInteracoes } from '../constants/interacoes';
 import { useHistoryStore } from '../lib/storage/historyStore';
 import { useSessionStore } from '../lib/storage/sessionStore';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { Card, CardContent } from '../components/ui/Card';
 import { AiDisclaimer } from '../components/AiDisclaimer';
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -88,16 +90,6 @@ const CLASSES_LABEL: Record<string, string> = {
   'Alfa-2 Agonista': 'Alfa-2',
 };
 
-const CENARIOS_IA = [
-  'Centro Cirúrgico — Cirurgia Eletiva',
-  'Centro Cirúrgico — Cirurgia de Emergência',
-  'Indução de Sequência Rápida (RSI)',
-  'Sedação em UTI — Ventilação Mecânica',
-  'Sedação Consciente para Procedimento',
-  'Paciente Hemodinamicamente Instável',
-  'Paciente Pediátrico',
-  'Paciente Idoso / ASA III–IV',
-];
 
 function getDilucaoText(droga: Droga): string {
   if (droga.observacoes?.toLowerCase().includes('diluição') || droga.observacoes?.toLowerCase().includes('diluir')) {
@@ -227,10 +219,10 @@ export function Drogas() {
   const isDraggingFilter = useRef(false);
   const dragStart = useRef({ x: 0, scrollLeft: 0 });
 
-  // Confirmed for calculation
-  const [peso, setPeso] = useState<number>(70);
-  const [idade, setIdade] = useState<number>(30);
-  const [tipo, setTipo] = useState<'Adulto' | 'Pediátrico'>('Adulto');
+  // Derived values for calculation (reactive)
+  const peso = Number(inputPeso) || 70;
+  const idade = Number(inputIdade) || 30;
+  const tipo = inputTipo;
 
   // Filter state
   const [busca, setBusca] = useState('');
@@ -244,11 +236,13 @@ export function Drogas() {
   const [interacoes, setInteracoes] = useState<string | null>(null);
   const [isCheckingInteractions, setIsCheckingInteractions] = useState(false);
 
-  // AI protocol suggestion state
-  const [showIAPanel, setShowIAPanel] = useState(false);
-  const [cenarioIA, setCenarioIA] = useState(CENARIOS_IA[0]);
-  const [iaSugestao, setIaSugestao] = useState<string | null>(null);
-  const [isLoadingIA, setIsLoadingIA] = useState(false);
+
+  // Checklist state
+  const [showChecklist, setShowChecklist] = useState(false);
+  const [quantidades, setQuantidades] = useState<Record<string, number>>({});
+  const [cenarioPrescricao, setCenarioPrescricao] = useState('Centro Cirúrgico');
+  const [sugestaoPrescrição, setSugestaoPrescrição] = useState<string | null>(null);
+  const [isSugerindoPrescricao, setIsSugerindoPrescricao] = useState(false);
 
   // History
   const [currentAvaliacaoId, setCurrentAvaliacaoId] = useState<string | null>(null);
@@ -263,18 +257,12 @@ export function Drogas() {
 
   useEffect(() => {
     if (!pacienteContext) return;
-    if (pacienteContext.peso != null) {
-      setInputPeso(pacienteContext.peso);
-      setPeso(pacienteContext.peso);
-    }
+    if (pacienteContext.peso != null) setInputPeso(pacienteContext.peso);
     if (pacienteContext.altura != null) setInputAltura(pacienteContext.altura);
     if (pacienteContext.sexo != null) setInputSexo(pacienteContext.sexo);
     if (pacienteContext.idade != null) {
       setInputIdade(pacienteContext.idade);
-      setIdade(pacienteContext.idade);
-      const tipoDerivado: 'Adulto' | 'Pediátrico' = pacienteContext.idade < 18 ? 'Pediátrico' : 'Adulto';
-      setInputTipo(tipoDerivado);
-      setTipo(tipoDerivado);
+      setInputTipo(pacienteContext.idade < 18 ? 'Pediátrico' : 'Adulto');
     }
   }, [pacienteContext]);
 
@@ -290,22 +278,6 @@ export function Drogas() {
   }, [busca, filtroClasse]);
 
   // Handlers
-  const handleConfirm = () => {
-    const newPeso = Number(inputPeso) || 0;
-    const newIdade = Number(inputIdade) || 0;
-    setPeso(newPeso);
-    setIdade(newIdade);
-    setTipo(inputTipo);
-
-    const id = addAvaliacao({
-      pacienteId: `PAC-${Math.floor(Math.random() * 10000)}`,
-      tipo: 'Drogas',
-      dados: { peso: newPeso, idade: newIdade, tipo: inputTipo },
-      resultado: { prescricao, interacoes },
-    });
-    setCurrentAvaliacaoId(id);
-  };
-
   const handleNumberChange = (setter: React.Dispatch<React.SetStateAction<number | ''>>) =>
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
@@ -316,7 +288,15 @@ export function Drogas() {
     setPrescricao(prev => {
       const exists = prev.find(d => d.nome === droga.nome);
       const newPrescricao = exists ? prev.filter(d => d.nome !== droga.nome) : [...prev, droga];
-      if (currentAvaliacaoId) {
+      if (!currentAvaliacaoId && newPrescricao.length > 0) {
+        const id = addAvaliacao({
+          pacienteId: `PAC-${Math.floor(Math.random() * 10000)}`,
+          tipo: 'Drogas',
+          dados: { peso, idade, tipo },
+          resultado: { prescricao: newPrescricao, interacoes: null },
+        });
+        setCurrentAvaliacaoId(id);
+      } else if (currentAvaliacaoId) {
         updateAvaliacao(currentAvaliacaoId, { resultado: { prescricao: newPrescricao, interacoes: null } });
       }
       return newPrescricao;
@@ -328,18 +308,15 @@ export function Drogas() {
 
   const aplicarProtocolo = (protocolo: ProtocoloSedacao) => {
     if (protocoloSelecionado === protocolo.id) {
-      // Deselect
       setProtocoloSelecionado(null);
       setPrescricao([]);
       setInteracoes(null);
-      setIaSugestao(null);
       return;
     }
     const drogas = DRUGS.filter(d => protocolo.drogas.includes(d.nome));
     setPrescricao(drogas);
     setProtocoloSelecionado(protocolo.id);
     setInteracoes(null);
-    setIaSugestao(null);
   };
 
   const handleCheckInteractions = async () => {
@@ -361,21 +338,29 @@ export function Drogas() {
     }
   };
 
-  const handleSugerirIA = async () => {
-    setIsLoadingIA(true);
-    setIaSugestao(null);
+
+  // Local automatic interactions (instant, no API)
+  const interacoesLocais = useMemo(
+    () => detectarInteracoes(prescricao.map(d => d.nome)),
+    [prescricao]
+  );
+
+  const handleSugerirPrescricao = async () => {
+    setIsSugerindoPrescricao(true);
+    setSugestaoPrescrição(null);
     try {
-      const paciente = pacienteContext ? {
-        peso: pacienteContext.peso,
-        idade: pacienteContext.idade,
-        sexo: pacienteContext.sexo,
-      } : undefined;
-      const result = await sugerirProtocoloSedacao(cenarioIA, paciente);
-      setIaSugestao(result);
+      const paciente = {
+        peso: pacienteContext?.peso,
+        idade: pacienteContext?.idade,
+        sexo: pacienteContext?.sexo,
+        alergias: pacienteContext?.alergias,
+      };
+      const result = await sugerirPrescricao(paciente, cenarioPrescricao);
+      setSugestaoPrescrição(result);
     } catch {
       alert('Erro ao consultar IA. Tente novamente.');
     } finally {
-      setIsLoadingIA(false);
+      setIsSugerindoPrescricao(false);
     }
   };
 
@@ -452,10 +437,10 @@ export function Drogas() {
               onChange={handleNumberChange(setInputIdade)}
             />
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-end">
+          <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{t('drugs.type')}</label>
-              <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 h-12">
+              <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 h-10">
                 <button
                   className={`flex-1 rounded-lg text-sm font-medium transition-all ${inputTipo === 'Adulto' ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
                   onClick={() => setInputTipo('Adulto')}
@@ -472,7 +457,7 @@ export function Drogas() {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Sexo</label>
-              <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 h-12">
+              <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 h-10">
                 <button
                   className={`flex-1 rounded-lg text-sm font-medium transition-all ${inputSexo === 'M' ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
                   onClick={() => setInputSexo('M')}
@@ -487,13 +472,6 @@ export function Drogas() {
                 </button>
               </div>
             </div>
-            <Button
-              onClick={handleConfirm}
-              className="col-span-2 md:col-span-1 h-16 md:h-12 w-full bg-cyan-500 text-black hover:bg-cyan-400 font-bold tracking-widest uppercase shadow-[0_0_20px_rgba(6,182,212,0.2)] whitespace-nowrap text-base md:text-sm"
-            >
-              <Check className="w-4 h-4 mr-2 shrink-0" />
-              Atualizar Doses
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -688,7 +666,7 @@ export function Drogas() {
           </div>
           {protocoloAtivo && (
             <button
-              onClick={() => { setProtocoloSelecionado(null); setPrescricao([]); setInteracoes(null); setIaSugestao(null); }}
+              onClick={() => { setProtocoloSelecionado(null); setPrescricao([]); setInteracoes(null); }}
               className="flex items-center gap-1.5 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
             >
               <RotateCcw className="w-3 h-3" />
@@ -732,150 +710,255 @@ export function Drogas() {
         )}
       </div>
 
-      {/* ── Prescription panel ────────────────────────────────── */}
+      {/* ── Floating pill cart button ──────────────────────────── */}
       <AnimatePresence>
         {prescricao.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 16 }}
+            transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+            onClick={() => setShowChecklist(true)}
+            className="fixed bottom-24 right-6 h-11 px-4 rounded-full bg-cyan-500 text-black shadow-xl shadow-cyan-500/30 flex items-center gap-2 z-40 hover:bg-cyan-400 active:scale-95 transition-colors"
           >
-            <Card className="border-indigo-500/20 bg-indigo-950/10 relative">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500" />
-              <CardHeader className="pb-4 border-b border-white/5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <CardTitle className="flex items-center gap-2 text-indigo-400 text-sm uppercase tracking-widest">
-                      <Activity className="w-4 h-4" />
-                      Prescrição Atual
-                      {protocoloAtivo && (
-                        <span className={`text-[10px] px-2 py-0.5 rounded-md border font-normal ${getProtocoloColors(protocoloAtivo.cor).chip}`}>
-                          {protocoloAtivo.nome}
-                        </span>
-                      )}
-                    </CardTitle>
-                    <p className="text-xs text-zinc-500 mt-1">{prescricao.length} medicamento(s) selecionado(s)</p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => { setShowIAPanel(v => !v); setIaSugestao(null); }}
-                      className="text-purple-400 border border-purple-500/30 hover:bg-purple-500/10"
-                    >
-                      <Brain className="w-3.5 h-3.5 mr-1.5" />
-                      Sugerir por IA
-                    </Button>
-                    {prescricao.length >= 2 && (
-                      <Button
-                        size="sm"
-                        onClick={handleCheckInteractions}
-                        disabled={isCheckingInteractions}
-                        className="bg-indigo-500 text-white hover:bg-indigo-600 shadow-[0_0_15px_rgba(99,102,241,0.3)]"
-                      >
-                        {isCheckingInteractions ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <Sparkles className="w-4 h-4 mr-2" />
-                        )}
-                        Verificar Interações
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-4 space-y-4">
-                {/* Drug chips */}
-                <div className="flex flex-wrap gap-2">
-                  {prescricao.map(droga => (
-                    <div key={droga.nome} className="flex items-center gap-2 px-3 py-1.5 bg-black/40 border border-white/10 rounded-lg">
-                      <span className="text-sm font-medium text-white">{droga.nome}</span>
-                      <button
-                        onClick={() => togglePrescricao(droga)}
-                        className="text-zinc-500 hover:text-rose-400 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+            <ShoppingCart className="w-5 h-5" />
+            <span className="text-sm font-bold">
+              {prescricao.length} {prescricao.length === 1 ? 'droga' : 'drogas'}
+            </span>
+            {interacoesLocais.some(i => i.severidade === 'critica') && (
+              <span className="w-2 h-2 rounded-full bg-rose-500 absolute -top-0.5 -right-0.5" />
+            )}
+          </motion.button>
+        )}
+      </AnimatePresence>
 
-                {/* IA panel */}
-                <AnimatePresence>
-                  {showIAPanel && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      className="p-4 rounded-2xl bg-purple-950/20 border border-purple-500/20 space-y-3"
+      {/* ── Checklist bottom sheet ─────────────────────────────── */}
+      <AnimatePresence>
+        {showChecklist && (
+          <>
+            {/* Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm"
+              onClick={() => setShowChecklist(false)}
+            />
+            {/* Panel */}
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className="fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a] border-t border-white/10 rounded-t-3xl overflow-hidden"
+              style={{ maxHeight: '85vh' }}
+            >
+              {/* Drag handle */}
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full bg-white/20" />
+              </div>
+
+              <div className="overflow-y-auto" style={{ maxHeight: 'calc(85vh - 32px)' }}>
+                <div className="p-5 space-y-5 pb-10">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                        <Activity className="w-5 h-5 text-cyan-400" />
+                        Prescrição Atual
+                        {protocoloAtivo && (
+                          <span className={`text-[10px] px-2 py-0.5 rounded-md border font-normal ${getProtocoloColors(protocoloAtivo.cor).chip}`}>
+                            {protocoloAtivo.nome}
+                          </span>
+                        )}
+                      </h2>
+                      <p className="text-xs text-zinc-500 mt-0.5">{prescricao.length} medicamento(s)</p>
+                    </div>
+                    <button
+                      onClick={() => setShowChecklist(false)}
+                      className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
                     >
-                      <p className="text-[10px] text-purple-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                        <Brain className="w-3 h-3" />
-                        Protocolo Personalizado — IA
-                      </p>
-                      <div className="flex gap-2 flex-wrap items-end">
-                        <div className="flex-1 min-w-48">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1 block">Cenário Clínico</label>
-                          <select
-                            value={cenarioIA}
-                            onChange={e => setCenarioIA(e.target.value)}
-                            className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-zinc-200 text-sm focus:outline-none focus:border-purple-500/50 transition-colors"
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Drug list with quantity controls */}
+                  <div className="space-y-2">
+                    {prescricao.map(droga => {
+                      const qty = quantidades[droga.nome] ?? 1;
+                      return (
+                        <div key={droga.nome} className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-white truncate">{droga.nome}</p>
+                            <span className={`inline-block px-1.5 py-0.5 mt-0.5 text-[9px] uppercase tracking-widest font-bold border rounded ${getDrugClassColor(droga.classe)}`}>
+                              {droga.classe}
+                            </span>
+                          </div>
+                          {/* Quantity controls */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => setQuantidades(q => ({ ...q, [droga.nome]: Math.max(1, (q[droga.nome] ?? 1) - 1) }))}
+                              className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <span className="text-sm font-mono text-white w-5 text-center">{qty}</span>
+                            <button
+                              onClick={() => setQuantidades(q => ({ ...q, [droga.nome]: (q[droga.nome] ?? 1) + 1 }))}
+                              className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
+                          {/* Remove */}
+                          <button
+                            onClick={() => togglePrescricao(droga)}
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
                           >
-                            {CENARIOS_IA.map(c => (
-                              <option key={c} value={c}>{c}</option>
-                            ))}
-                          </select>
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Automatic local interactions */}
+                  {interacoesLocais.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-1.5">
+                        <AlertCircle className="w-3 h-3" />
+                        Interações Detectadas
+                      </p>
+                      {interacoesLocais.map((interacao, i) => {
+                        const severidadeStyle = {
+                          critica:  'border-rose-500/30 bg-rose-500/10 text-rose-300',
+                          moderada: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+                          info:     'border-cyan-500/30 bg-cyan-500/10 text-cyan-300',
+                        }[interacao.severidade];
+                        const iconColor = {
+                          critica:  'text-rose-400',
+                          moderada: 'text-amber-400',
+                          info:     'text-cyan-400',
+                        }[interacao.severidade];
+                        return (
+                          <div key={i} className={`p-3 rounded-2xl border ${severidadeStyle}`}>
+                            <div className="flex items-start gap-2">
+                              <TriangleAlert className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${iconColor}`} />
+                              <div>
+                                <p className="text-xs font-bold">{interacao.titulo}</p>
+                                <p className="text-[11px] opacity-80 mt-0.5 leading-relaxed">{interacao.mensagem}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* AI buttons */}
+                  <div className="space-y-3">
+                    {/* Verificar interações por IA */}
+                    {prescricao.length >= 2 && (
+                      <div className="space-y-2">
                         <Button
-                          onClick={handleSugerirIA}
-                          disabled={isLoadingIA}
-                          className="h-10 bg-purple-600 hover:bg-purple-500 text-white shrink-0"
+                          onClick={handleCheckInteractions}
+                          disabled={isCheckingInteractions}
+                          className="w-full bg-indigo-600 text-white hover:bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.2)]"
                         >
-                          {isLoadingIA ? (
+                          {isCheckingInteractions ? (
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                           ) : (
-                            <ChevronRight className="w-4 h-4 mr-1" />
+                            <Sparkles className="w-4 h-4 mr-2" />
                           )}
-                          Consultar
+                          Verificar Interações (IA)
                         </Button>
+                        {interacoes && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="p-4 rounded-2xl bg-black/40 border border-indigo-500/20"
+                          >
+                            <p className="text-[10px] text-indigo-400 uppercase tracking-widest font-bold flex items-center gap-1.5 mb-3">
+                              <Sparkles className="w-3 h-3" />
+                              Análise de Interações (IA)
+                            </p>
+                            <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-indigo-500 prose-strong:text-indigo-300">
+                              <Markdown>{interacoes}</Markdown>
+                            </div>
+                            <AiDisclaimer />
+                          </motion.div>
+                        )}
                       </div>
-                      {iaSugestao && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="mt-2 p-4 rounded-xl bg-black/40 border border-purple-500/10"
-                        >
-                          <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-purple-500 prose-strong:text-purple-300 prose-headings:text-purple-300">
-                            <Markdown>{iaSugestao}</Markdown>
-                          </div>
-                          <AiDisclaimer />
-                        </motion.div>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                    )}
 
-                {/* Interactions result */}
-                {interacoes && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-5 rounded-2xl bg-black/40 border border-indigo-500/20"
+                    {/* Sugerir prescrição por IA */}
+                    {pacienteContext && (
+                      <div className="space-y-2">
+                        <div className="flex gap-2 items-end">
+                          <div className="flex-1">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block">Cenário da Prescrição</label>
+                            <select
+                              value={cenarioPrescricao}
+                              onChange={e => { setCenarioPrescricao(e.target.value); setSugestaoPrescrição(null); }}
+                              className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-zinc-200 text-sm focus:outline-none focus:border-purple-500/50 transition-colors"
+                            >
+                              {['Centro Cirúrgico', 'UTI', 'Emergência / Pronto-Socorro', 'Procedimento Ambulatorial', 'Sedação Diagnóstica'].map(c => (
+                                <option key={c} value={c}>{c}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <Button
+                            onClick={handleSugerirPrescricao}
+                            disabled={isSugerindoPrescricao}
+                            className="h-10 bg-purple-600 hover:bg-purple-500 text-white shrink-0"
+                          >
+                            {isSugerindoPrescricao ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Brain className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
+                        {sugestaoPrescrição && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="p-4 rounded-2xl bg-black/40 border border-purple-500/20"
+                          >
+                            <p className="text-[10px] text-purple-400 uppercase tracking-widest font-bold flex items-center gap-1.5 mb-3">
+                              <Brain className="w-3 h-3" />
+                              Sugestão de Prescrição — {cenarioPrescricao}
+                            </p>
+                            <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-purple-500 prose-strong:text-purple-300 prose-headings:text-purple-300">
+                              <Markdown>{sugestaoPrescrição}</Markdown>
+                            </div>
+                            <AiDisclaimer />
+                          </motion.div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Clear all */}
+                  <button
+                    onClick={() => {
+                      setPrescricao([]);
+                      setInteracoes(null);
+                      setSugestaoPrescrição(null);
+                      setProtocoloSelecionado(null);
+                      setQuantidades({});
+                      setShowChecklist(false);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-sm text-zinc-600 hover:text-rose-400 hover:bg-rose-500/5 border border-white/5 hover:border-rose-500/20 transition-all"
                   >
-                    <p className="text-[10px] text-indigo-400 uppercase tracking-widest font-bold flex items-center gap-1.5 mb-4">
-                      <Sparkles className="w-3 h-3" />
-                      Análise de Interações (IA)
-                    </p>
-                    <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-indigo-500 prose-strong:text-indigo-300">
-                      <Markdown>{interacoes}</Markdown>
-                    </div>
-                    <AiDisclaimer />
-                  </motion.div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    Limpar prescrição
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
 
