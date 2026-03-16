@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Pill, Search, AlertCircle, Check, Plus, X, Activity, Loader2,
   Sparkles, UserCheck, FlaskConical, ChevronRight, Zap, Brain,
   Heart, Shield, Syringe, Droplets, RotateCcw, Calculator,
+  ArrowLeftRight, User, ChevronDown, TriangleAlert,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
@@ -106,6 +107,94 @@ function getDilucaoText(droga: Droga): string {
   return `${droga.volumeAmpola} mL · ${droga.concentracaoPadrao} mg/mL · ${total.toFixed(0)} mg/ampola`;
 }
 
+// ── Protocols for Calculator tab ──────────────────────────────
+const PROTOCOLOS_CALC = [
+  {
+    id: 'ketodex', nome: 'KETODEX', contexto: 'Procedimento', cor: 'purple' as const,
+    descricao: 'Ketamina + Dexmedetomidina — sedação procedural com preservação de via aérea',
+    drogas: [
+      { nome: 'Ketamina', bolus: { dose: 0.5, unidade: 'mg/kg', descricao: 'Bolus de indução' }, infusao: { min: 0.1, max: 0.3, unidade: 'mg/kg/h' }, concPadrao: 50 },
+      { nome: 'Dexmedetomidina', bolus: { dose: 1, unidade: 'mcg/kg', descricao: 'Bolus em 10 min (opcional)' }, infusao: { min: 0.2, max: 0.7, unidade: 'mcg/kg/h' }, concPadrao: 4 },
+    ],
+  },
+  {
+    id: 'tiva', nome: 'TIVA', contexto: 'Centro Cirúrgico', cor: 'amber' as const,
+    descricao: 'Anestesia Total IV — Propofol + Remifentanil + Rocurônio',
+    drogas: [
+      { nome: 'Propofol', bolus: { dose: 2, unidade: 'mg/kg', descricao: 'Indução' }, infusao: { min: 25, max: 75, unidade: 'mcg/kg/min' }, concPadrao: 10 },
+      { nome: 'Remifentanil', bolus: null, infusao: { min: 0.05, max: 0.5, unidade: 'mcg/kg/min' }, concPadrao: 0.05 },
+      { nome: 'Rocurônio', bolus: { dose: 0.6, unidade: 'mg/kg', descricao: 'Bloqueio neuromuscular' }, infusao: null, concPadrao: 10 },
+    ],
+  },
+  {
+    id: 'rsi', nome: 'RSI', contexto: 'Emergência', cor: 'rose' as const,
+    descricao: 'Sequência Rápida de Intubação',
+    drogas: [
+      { nome: 'Ketamina', bolus: { dose: 1.5, unidade: 'mg/kg', descricao: 'Indução ISR' }, infusao: null, concPadrao: 50 },
+      { nome: 'Succinilcolina', bolus: { dose: 1.5, unidade: 'mg/kg', descricao: 'Bloqueio rápido' }, infusao: null, concPadrao: 20 },
+    ],
+  },
+  {
+    id: 'sedacao-consciente', nome: 'Sed. Consciente', contexto: 'Procedimento', cor: 'emerald' as const,
+    descricao: 'Mantém reflexos — Midazolam + Fentanil',
+    drogas: [
+      { nome: 'Midazolam', bolus: { dose: 0.05, unidade: 'mg/kg', descricao: 'Titulado IV lento' }, infusao: null, concPadrao: 5 },
+      { nome: 'Fentanil', bolus: { dose: 1.5, unidade: 'mcg/kg', descricao: 'Analgesia' }, infusao: null, concPadrao: 0.05 },
+    ],
+  },
+  {
+    id: 'uti-sedacao', nome: 'Sedação UTI', contexto: 'UTI', cor: 'indigo' as const,
+    descricao: 'RASS -2 a 0 — Propofol + Fentanil (± Dexmedetomidina)',
+    drogas: [
+      { nome: 'Propofol', bolus: null, infusao: { min: 10, max: 50, unidade: 'mcg/kg/min' }, concPadrao: 10 },
+      { nome: 'Fentanil', bolus: null, infusao: { min: 0.5, max: 1.5, unidade: 'mcg/kg/h' }, concPadrao: 0.05 },
+      { nome: 'Dexmedetomidina', bolus: null, infusao: { min: 0.2, max: 0.7, unidade: 'mcg/kg/h' }, concPadrao: 4 },
+    ],
+  },
+  {
+    id: 'hemo-instavel', nome: 'Instab. Hemodinâmica', contexto: 'Emergência', cor: 'orange' as const,
+    descricao: 'Paciente instável — Etomidato + Fentanil + Rocurônio',
+    drogas: [
+      { nome: 'Etomidato', bolus: { dose: 0.3, unidade: 'mg/kg', descricao: 'Indução (menor depressão CV)' }, infusao: null, concPadrao: 2 },
+      { nome: 'Fentanil', bolus: { dose: 1, unidade: 'mcg/kg', descricao: 'Analgesia cuidadosa' }, infusao: null, concPadrao: 0.05 },
+      { nome: 'Rocurônio', bolus: { dose: 1.2, unidade: 'mg/kg', descricao: 'RSI dose' }, infusao: null, concPadrao: 10 },
+    ],
+  },
+];
+
+type ProtocalcDroga = typeof PROTOCOLOS_CALC[0]['drogas'][0];
+
+const calcDoseProtocolo = (droga: ProtocalcDroga, pesoKg: number) => {
+  const results: { label: string; valor: string; mL: string }[] = [];
+  if (droga.bolus) {
+    const doseTotal = droga.bolus.dose * pesoKg;
+    const isMcg = droga.bolus.unidade.includes('mcg');
+    const mL = doseTotal / (isMcg ? droga.concPadrao * 1000 : droga.concPadrao);
+    results.push({
+      label: `Bolus — ${droga.bolus.descricao}`,
+      valor: `${doseTotal.toFixed(1)} ${isMcg ? 'mcg' : 'mg'}`,
+      mL: `${mL.toFixed(1)} mL`,
+    });
+  }
+  if (droga.infusao) {
+    const toMgH = (val: number, unit: string) => {
+      if (unit.includes('mcg/kg/min')) return val * pesoKg * 60 / 1000;
+      if (unit.includes('mcg/kg/h')) return val * pesoKg / 1000;
+      return val * pesoKg;
+    };
+    const minMg = toMgH(droga.infusao.min, droga.infusao.unidade);
+    const maxMg = toMgH(droga.infusao.max, droga.infusao.unidade);
+    const minMlh = minMg / droga.concPadrao;
+    const maxMlh = maxMg / droga.concPadrao;
+    results.push({
+      label: `Infusão`,
+      valor: `${droga.infusao.min}–${droga.infusao.max} ${droga.infusao.unidade}`,
+      mL: `${minMlh.toFixed(1)}–${maxMlh.toFixed(1)} mL/h`,
+    });
+  }
+  return results;
+};
+
 // ── Component ─────────────────────────────────────────────────
 
 export function Drogas() {
@@ -117,7 +206,26 @@ export function Drogas() {
   const [inputIdade, setInputIdade] = useState<number | ''>(30);
   const [inputTipo, setInputTipo] = useState<'Adulto' | 'Pediátrico'>('Adulto');
   const [inputSexo, setInputSexo] = useState<'M' | 'F'>('M');
-  const [showCalculadoras, setShowCalculadoras] = useState(false);
+
+  // Calculator tabs
+  const [calcTab, setCalcTab] = useState<'paciente' | 'gotejamento' | 'conversao' | 'protocolos'>('paciente');
+  // Gotejamento
+  const [gotaDose, setGotaDose] = useState<number | ''>('');
+  const [gotaUnidade, setGotaUnidade] = useState<'mcg_kg_min' | 'mg_min'>('mcg_kg_min');
+  const [gotaConc, setGotaConc] = useState<number | ''>('');
+  // Conversão
+  const [convDe, setConvDe] = useState<'mcgkgmin' | 'mcgmin' | 'mlh_macro' | 'mlh_micro'>('mcgkgmin');
+  const [convValor, setConvValor] = useState<number | ''>(5);
+  // Protocolos (calc)
+  const [protCalcSel, setProtCalcSel] = useState<string>('ketodex');
+
+  // Drug card expand/collapse
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+
+  // Drag refs for class filter
+  const filterRef = useRef<HTMLDivElement>(null);
+  const isDraggingFilter = useRef(false);
+  const dragStart = useRef({ x: 0, scrollLeft: 0 });
 
   // Confirmed for calculation
   const [peso, setPeso] = useState<number>(70);
@@ -390,75 +498,186 @@ export function Drogas() {
         </CardContent>
       </Card>
 
-      {/* ── Calculadoras ──────────────────────────────────────── */}
-      {(() => {
-        const alturaNum = Number(inputAltura) || 0;
-        const pesoNum   = Number(inputPeso)   || 0;
-        const ibw  = alturaNum > 100 ? calcularIBW(alturaNum, inputSexo) : null;
-        const imc  = alturaNum > 0 && pesoNum > 0 ? calcularIMC(alturaNum, pesoNum) : null;
-        const abw  = ibw !== null && imc !== null && imc > 30 ? calcularABW(pesoNum, ibw) : null;
-        const vt   = ibw !== null ? calcularVolumeCorrente(ibw) : null;
-        const hasData = ibw !== null || imc !== null;
-        const imcColor = imc === null ? '' : imc < 18.5 ? 'text-blue-400' : imc < 25 ? 'text-emerald-400' : imc < 30 ? 'text-amber-400' : 'text-rose-400';
-        const imcLabel = imc === null ? '' : imc < 18.5 ? 'Baixo peso' : imc < 25 ? 'Normal' : imc < 30 ? 'Sobrepeso' : 'Obesidade';
-        return (
-          <div>
+      {/* ── Calculadoras (tabbed) ─────────────────────────────── */}
+      <div className="bg-black/40 border border-white/5 rounded-2xl overflow-hidden">
+        {/* Tab bar */}
+        <div className="flex border-b border-white/5">
+          {([
+            { id: 'paciente',    icon: User,           label: 'Paciente' },
+            { id: 'gotejamento', icon: Droplets,        label: 'Gotejamento' },
+            { id: 'conversao',   icon: ArrowLeftRight,  label: 'Conversão' },
+            { id: 'protocolos',  icon: FlaskConical,    label: 'Protocolos' },
+          ] as const).map(tab => (
             <button
-              onClick={() => setShowCalculadoras(v => !v)}
-              className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors mb-3"
+              key={tab.id}
+              onClick={() => setCalcTab(tab.id)}
+              className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 py-3 px-2 text-[10px] font-bold uppercase tracking-widest transition-all border-b-2 ${
+                calcTab === tab.id
+                  ? 'border-cyan-500 text-cyan-400 bg-cyan-500/5'
+                  : 'border-transparent text-zinc-600 hover:text-zinc-400 hover:bg-white/3'
+              }`}
             >
-              <Calculator className="w-4 h-4" />
-              Calculadoras
-              <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${showCalculadoras ? 'rotate-90' : ''}`} />
+              <tab.icon className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">{tab.label}</span>
             </button>
-            <AnimatePresence>
-              {showCalculadoras && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  {!hasData ? (
-                    <p className="text-xs text-zinc-600 pb-3">Preencha Peso, Altura e Sexo para ver os cálculos.</p>
-                  ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pb-2">
-                      {ibw !== null && (
-                        <div className="p-3 rounded-2xl bg-black/40 border border-white/5">
-                          <p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-1 font-bold">PIE</p>
-                          <p className="text-xl font-mono text-white">{ibw.toFixed(1)} <span className="text-xs text-zinc-500">kg</span></p>
-                          <p className="text-[10px] text-zinc-600 mt-0.5">Peso Ideal</p>
-                        </div>
-                      )}
-                      {imc !== null && (
-                        <div className="p-3 rounded-2xl bg-black/40 border border-white/5">
-                          <p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-1 font-bold">IMC</p>
-                          <p className={`text-xl font-mono ${imcColor}`}>{imc.toFixed(1)}</p>
-                          <p className="text-[10px] text-zinc-600 mt-0.5">{imcLabel}</p>
-                        </div>
-                      )}
-                      {abw !== null && (
-                        <div className="p-3 rounded-2xl bg-black/40 border border-white/5">
-                          <p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-1 font-bold">PIA</p>
-                          <p className="text-xl font-mono text-white">{abw.toFixed(1)} <span className="text-xs text-zinc-500">kg</span></p>
-                          <p className="text-[10px] text-zinc-600 mt-0.5">Peso Ajustado</p>
-                        </div>
-                      )}
-                      {vt !== null && (
-                        <div className="p-3 rounded-2xl bg-black/40 border border-white/5">
-                          <p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-1 font-bold">VT</p>
-                          <p className="text-xl font-mono text-white">{vt.toFixed(0)} <span className="text-xs text-zinc-500">mL</span></p>
-                          <p className="text-[10px] text-zinc-600 mt-0.5">Vol. Corrente</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        );
-      })()}
+          ))}
+        </div>
+
+        {/* Tab content */}
+        <div className="p-4">
+          {/* ─ Paciente ─ */}
+          {calcTab === 'paciente' && (() => {
+            const alturaNum = Number(inputAltura) || 0;
+            const pesoNum   = Number(inputPeso)   || 0;
+            const ibw  = alturaNum > 100 ? calcularIBW(alturaNum, inputSexo) : null;
+            const imc  = alturaNum > 0 && pesoNum > 0 ? calcularIMC(alturaNum, pesoNum) : null;
+            const abw  = ibw !== null && imc !== null && imc > 30 ? calcularABW(pesoNum, ibw) : null;
+            const vt   = ibw !== null ? calcularVolumeCorrente(ibw) : null;
+            const imcColor = imc === null ? '' : imc < 18.5 ? 'text-blue-400' : imc < 25 ? 'text-emerald-400' : imc < 30 ? 'text-amber-400' : 'text-rose-400';
+            const imcLabel = imc === null ? '' : imc < 18.5 ? 'Baixo peso' : imc < 25 ? 'Normal' : imc < 30 ? 'Sobrepeso' : 'Obesidade';
+            return ibw === null && imc === null ? (
+              <p className="text-xs text-zinc-600 py-2">Preencha Peso, Altura e Sexo para ver os cálculos.</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {ibw !== null && <div className="p-3 rounded-xl bg-black/40 border border-white/5"><p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-1 font-bold">PIE</p><p className="text-xl font-mono text-white">{ibw.toFixed(1)} <span className="text-xs text-zinc-500">kg</span></p><p className="text-[10px] text-zinc-600 mt-0.5">Peso Ideal</p></div>}
+                {imc !== null && <div className="p-3 rounded-xl bg-black/40 border border-white/5"><p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-1 font-bold">IMC</p><p className={`text-xl font-mono ${imcColor}`}>{imc.toFixed(1)}</p><p className="text-[10px] text-zinc-600 mt-0.5">{imcLabel}</p></div>}
+                {abw !== null && <div className="p-3 rounded-xl bg-black/40 border border-white/5"><p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-1 font-bold">PIA</p><p className="text-xl font-mono text-white">{abw.toFixed(1)} <span className="text-xs text-zinc-500">kg</span></p><p className="text-[10px] text-zinc-600 mt-0.5">Peso Ajustado</p></div>}
+                {vt !== null && <div className="p-3 rounded-xl bg-black/40 border border-white/5"><p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-1 font-bold">VT</p><p className="text-xl font-mono text-white">{vt.toFixed(0)} <span className="text-xs text-zinc-500">mL</span></p><p className="text-[10px] text-zinc-600 mt-0.5">Vol. Corrente</p></div>}
+              </div>
+            );
+          })()}
+
+          {/* ─ Gotejamento ─ */}
+          {calcTab === 'gotejamento' && (() => {
+            const dose = Number(gotaDose) || 0;
+            const conc = Number(gotaConc) || 0;
+            const p = Number(inputPeso) || 70;
+            const mlh = dose && conc
+              ? gotaUnidade === 'mcg_kg_min'
+                ? (dose * p * 60) / (conc * 1000)
+                : (dose * 60) / conc
+              : null;
+            const macro = mlh !== null ? (mlh * 20) / 60 : null;
+            const micro = mlh !== null ? mlh : null;
+            return (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block">Dose</label>
+                    <input type="number" value={gotaDose} onChange={e => setGotaDose(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="0" className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-zinc-100 text-sm focus:outline-none focus:border-cyan-500/50 transition-colors" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block">Unidade</label>
+                    <select value={gotaUnidade} onChange={e => setGotaUnidade(e.target.value as 'mcg_kg_min' | 'mg_min')}
+                      className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-zinc-200 text-sm focus:outline-none focus:border-cyan-500/50 transition-colors">
+                      <option value="mcg_kg_min">mcg/kg/min</option>
+                      <option value="mg_min">mg/min</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block">Conc. (mg/mL)</label>
+                    <input type="number" value={gotaConc} onChange={e => setGotaConc(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="0" className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-zinc-100 text-sm focus:outline-none focus:border-cyan-500/50 transition-colors" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block">Peso (kg)</label>
+                    <input type="number" value={inputPeso} readOnly
+                      className="w-full h-10 px-3 rounded-xl border border-white/5 bg-black/20 text-zinc-400 text-sm cursor-not-allowed" />
+                  </div>
+                </div>
+                {mlh !== null && (
+                  <div className="grid grid-cols-3 gap-2 pt-1">
+                    <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-center"><p className="text-[9px] text-cyan-500 uppercase tracking-wider font-bold mb-1">mL/h</p><p className="text-lg font-mono text-cyan-300">{mlh.toFixed(2)}</p></div>
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/5 text-center"><p className="text-[9px] text-zinc-500 uppercase tracking-wider font-bold mb-1">Macro gts/min</p><p className="text-lg font-mono text-white">{macro!.toFixed(1)}</p></div>
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/5 text-center"><p className="text-[9px] text-zinc-500 uppercase tracking-wider font-bold mb-1">Micro gts/min</p><p className="text-lg font-mono text-white">{micro!.toFixed(1)}</p></div>
+                  </div>
+                )}
+                <p className="text-[10px] text-zinc-600 italic">Macrogotas: 20 gts/mL · Microgotas: 60 gts/mL</p>
+              </div>
+            );
+          })()}
+
+          {/* ─ Conversão ─ */}
+          {calcTab === 'conversao' && (() => {
+            const v = Number(convValor) || 0;
+            const p = Number(inputPeso) || 70;
+            let resultado = '';
+            if (convDe === 'mcgkgmin') resultado = `${(v * p * 60 / 1000).toFixed(2)} mg/h`;
+            else if (convDe === 'mcgmin') resultado = `${(v * 60 / 1000).toFixed(2)} mg/h`;
+            else if (convDe === 'mlh_macro') resultado = `${(v * 20 / 60).toFixed(1)} gts/min (macro) · ${(v).toFixed(1)} microgotas/min`;
+            else resultado = `${(v / 3).toFixed(1)} gts/min (macro) · ${(v).toFixed(1)} microgotas/min`;
+            return (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block">Converter de</label>
+                    <select value={convDe} onChange={e => setConvDe(e.target.value as 'mcgkgmin' | 'mcgmin' | 'mlh_macro' | 'mlh_micro')}
+                      className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-zinc-200 text-sm focus:outline-none focus:border-cyan-500/50 transition-colors">
+                      <option value="mcgkgmin">mcg/kg/min → mg/h</option>
+                      <option value="mcgmin">mcg/min → mg/h</option>
+                      <option value="mlh_macro">mL/h → gotas/min</option>
+                      <option value="mlh_micro">microgotas/min → gotas/min</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block">Valor</label>
+                    <input type="number" value={convValor} onChange={e => setConvValor(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-zinc-100 text-sm focus:outline-none focus:border-cyan-500/50 transition-colors" />
+                  </div>
+                </div>
+                {(convDe === 'mcgkgmin') && (
+                  <p className="text-[10px] text-zinc-500">Peso usado: {p} kg (do campo acima)</p>
+                )}
+                <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+                  <p className="text-[9px] text-cyan-500 uppercase tracking-wider font-bold mb-1">Resultado</p>
+                  <p className="text-base font-mono text-cyan-300">{resultado}</p>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ─ Protocolos ─ */}
+          {calcTab === 'protocolos' && (() => {
+            const pesoCalc = Number(inputPeso) || 70;
+            const prot = PROTOCOLOS_CALC.find(p => p.id === protCalcSel)!;
+            const colors = getProtocoloColors(prot.cor);
+            return (
+              <div className="space-y-3">
+                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                  {PROTOCOLOS_CALC.map(p => {
+                    const c = getProtocoloColors(p.cor);
+                    return (
+                      <button key={p.id} onClick={() => setProtCalcSel(p.id)}
+                        className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${protCalcSel === p.id ? c.active : c.chip}`}>
+                        {p.nome}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-zinc-500 italic">{prot.descricao}</p>
+                <div className="space-y-2">
+                  {prot.drogas.map(droga => {
+                    const doses = calcDoseProtocolo(droga, pesoCalc);
+                    return (
+                      <div key={droga.nome} className="p-3 rounded-xl bg-black/40 border border-white/5">
+                        <p className="text-xs font-bold text-white mb-2">{droga.nome}</p>
+                        {doses.map((d, i) => (
+                          <div key={i} className="flex justify-between items-baseline text-[11px] py-0.5">
+                            <span className="text-zinc-500">{d.label}</span>
+                            <span className="font-mono text-zinc-300">{d.valor} <span className="text-cyan-400">→ {d.mL}</span></span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-zinc-600 italic">Peso: {pesoCalc} kg · Concentrações padrão; confirme com protocolo institucional.</p>
+              </div>
+            );
+          })()}
+        </div>
+      </div>
 
       {/* ── Protocols ─────────────────────────────────────────── */}
       <div>
@@ -661,7 +880,30 @@ export function Drogas() {
       </AnimatePresence>
 
       {/* ── Class filter chips ────────────────────────────────── */}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+      <div
+        ref={filterRef}
+        className="flex gap-2 overflow-x-auto pb-1 scrollbar-none select-none"
+        style={{ cursor: isDraggingFilter.current ? 'grabbing' : 'grab' }}
+        onMouseDown={(e) => {
+          if (!filterRef.current) return;
+          isDraggingFilter.current = true;
+          dragStart.current = { x: e.pageX, scrollLeft: filterRef.current.scrollLeft };
+          filterRef.current.style.cursor = 'grabbing';
+        }}
+        onMouseMove={(e) => {
+          if (!isDraggingFilter.current || !filterRef.current) return;
+          e.preventDefault();
+          filterRef.current.scrollLeft = dragStart.current.scrollLeft - (e.pageX - dragStart.current.x);
+        }}
+        onMouseUp={() => {
+          isDraggingFilter.current = false;
+          if (filterRef.current) filterRef.current.style.cursor = 'grab';
+        }}
+        onMouseLeave={() => {
+          isDraggingFilter.current = false;
+          if (filterRef.current) filterRef.current.style.cursor = 'grab';
+        }}
+      >
         {CLASSES_FILTRO.map(cls => (
           <button
             key={cls}
@@ -697,6 +939,11 @@ export function Drogas() {
             const classColor = getDrugClassColor(droga.classe);
             const isSelected = prescricao.some(d => d.nome === droga.nome);
 
+            const isExpanded = expandedCard === droga.nome;
+            const hasAlergia = (pacienteContext?.alergias ?? []).some(
+              a => droga.nome.toLowerCase().includes(a.toLowerCase()) || droga.classe.toLowerCase().includes(a.toLowerCase())
+            );
+
             return (
               <motion.div
                 key={droga.nome}
@@ -704,110 +951,123 @@ export function Drogas() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+                transition={{ duration: 0.12, ease: 'easeOut' }}
               >
-                <Card className={`h-full flex flex-col transition-all ${
+                <Card className={`transition-all ${
                   isSelected
                     ? 'border-indigo-500/50 bg-indigo-950/10 shadow-[0_0_20px_rgba(99,102,241,0.08)]'
                     : 'hover:border-white/10 bg-zinc-900/20'
                 }`}>
-                  {/* Card header */}
-                  <CardHeader className="pb-3 border-b border-white/5">
-                    <div className="flex justify-between items-start gap-2">
+                  {/* Card header — always visible, click to expand */}
+                  <div
+                    className="flex items-center justify-between gap-2 p-4 cursor-pointer select-none"
+                    onClick={() => setExpandedCard(isExpanded ? null : droga.nome)}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <ChevronDown className={`w-3.5 h-3.5 text-zinc-600 shrink-0 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''}`} />
                       <div className="min-w-0">
-                        <CardTitle className="text-lg text-white tracking-tight leading-tight">{droga.nome}</CardTitle>
-                        <span className={`inline-flex items-center px-2 py-0.5 mt-1.5 text-[9px] uppercase tracking-widest font-bold border rounded-md ${classColor}`}>
+                        <p className="text-sm font-bold text-white leading-tight truncate">{droga.nome}</p>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 mt-1 text-[9px] uppercase tracking-widest font-bold border rounded-md ${classColor}`}>
+                          {hasAlergia && <TriangleAlert className="w-2.5 h-2.5" />}
                           {droga.classe}
                         </span>
                       </div>
-                      <div className="flex flex-col items-end gap-2 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => togglePrescricao(droga)}
-                          className={`w-8 h-8 rounded-full transition-all ${
-                            isSelected
-                              ? 'bg-indigo-500 text-white hover:bg-indigo-600'
-                              : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
-                          }`}
-                        >
-                          {isSelected ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                        </Button>
-                      </div>
                     </div>
-                  </CardHeader>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => { e.stopPropagation(); togglePrescricao(droga); }}
+                      className={`w-8 h-8 rounded-full shrink-0 transition-all ${
+                        isSelected
+                          ? 'bg-indigo-500 text-white hover:bg-indigo-600'
+                          : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      {isSelected ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    </Button>
+                  </div>
 
-                  <CardContent className="pt-4 flex-1 flex flex-col gap-3">
-                    {/* Bolus */}
-                    {calculo.doseBolusMin !== undefined && (
-                      <div className="bg-black/30 p-3 rounded-xl border border-white/5">
-                        <p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-2 font-bold">{t('drugs.bolus')}</p>
-                        <div className="flex justify-between items-baseline">
-                          <p className="text-base font-mono text-white">
-                            {calculo.doseBolusMin.toFixed(1)}
-                            {calculo.doseBolusMin !== calculo.doseBolusMax ? ` – ${calculo.doseBolusMax?.toFixed(1)}` : ''}
-                            <span className="text-[10px] text-zinc-500 font-sans ml-1">{calculo.unidadeBolus}</span>
-                          </p>
-                          <p className="text-base font-mono text-cyan-400">
-                            {calculo.volumeBolusMin?.toFixed(1)}
-                            {calculo.volumeBolusMin !== calculo.volumeBolusMax ? ` – ${calculo.volumeBolusMax?.toFixed(1)}` : ''}
-                            <span className="text-[10px] font-sans text-cyan-500/50 ml-1">mL</span>
-                          </p>
+                  {/* Expandable content */}
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.18, ease: 'easeOut' }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-4 pb-4 flex flex-col gap-3 border-t border-white/5 pt-3">
+                          {/* Allergy alert */}
+                          {hasAlergia && (
+                            <div className="flex items-center gap-2 p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl">
+                              <TriangleAlert className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                              <p className="text-[11px] text-rose-300 font-medium">Possível alergia registrada — confirme com paciente</p>
+                            </div>
+                          )}
+
+                          {/* Bolus */}
+                          {calculo.doseBolusMin !== undefined && (
+                            <div className="bg-black/30 p-3 rounded-xl border border-white/5">
+                              <p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-2 font-bold">{t('drugs.bolus')}</p>
+                              <div className="flex justify-between items-baseline">
+                                <p className="text-base font-mono text-white">
+                                  {calculo.doseBolusMin.toFixed(1)}
+                                  {calculo.doseBolusMin !== calculo.doseBolusMax ? ` – ${calculo.doseBolusMax?.toFixed(1)}` : ''}
+                                  <span className="text-[10px] text-zinc-500 font-sans ml-1">{calculo.unidadeBolus}</span>
+                                </p>
+                                <p className="text-base font-mono text-cyan-400">
+                                  {calculo.volumeBolusMin?.toFixed(1)}
+                                  {calculo.volumeBolusMin !== calculo.volumeBolusMax ? ` – ${calculo.volumeBolusMax?.toFixed(1)}` : ''}
+                                  <span className="text-[10px] font-sans text-cyan-500/50 ml-1">mL</span>
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Infusion */}
+                          {calculo.doseInfusaoMin !== undefined && (
+                            <div className="bg-black/30 p-3 rounded-xl border border-white/5">
+                              <p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-2 font-bold">{t('drugs.infusion')}</p>
+                              <div className="flex justify-between items-baseline">
+                                <p className="text-base font-mono text-white">
+                                  {calculo.doseInfusaoMin.toFixed(1)}
+                                  {calculo.doseInfusaoMin !== calculo.doseInfusaoMax ? ` – ${calculo.doseInfusaoMax?.toFixed(1)}` : ''}
+                                  <span className="text-[10px] text-zinc-500 font-sans ml-1">{calculo.unidadeInfusao}</span>
+                                </p>
+                                <p className="text-lg font-mono font-bold text-purple-400">
+                                  {calculo.taxaInfusaoMin?.toFixed(1)}
+                                  {calculo.taxaInfusaoMin !== calculo.taxaInfusaoMax ? ` – ${calculo.taxaInfusaoMax?.toFixed(1)}` : ''}
+                                  <span className="text-[10px] font-sans text-purple-500/60 ml-1">mL/h</span>
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-white/5">
+                                <Droplets className="w-3 h-3 text-zinc-600 shrink-0" />
+                                <p className="text-[10px] text-zinc-600 font-mono leading-tight">{getDilucaoText(droga)}</p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Clinical alert */}
+                          {calculo.alerta && (
+                            <div className="flex items-start gap-2.5 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl">
+                              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                              <p className="text-[11px] text-rose-300 leading-relaxed">{calculo.alerta}</p>
+                            </div>
+                          )}
+
+                          {/* Ampoule / observations */}
+                          <div className="flex items-center gap-1.5 pt-1 border-t border-white/5">
+                            <Droplets className="w-3 h-3 text-zinc-600 shrink-0" />
+                            <p className="text-[10px] text-zinc-600 font-mono">{getDilucaoText(droga)}</p>
+                          </div>
+                          {droga.observacoes && (
+                            <p className="text-[10px] text-zinc-600 italic leading-relaxed">{droga.observacoes}</p>
+                          )}
                         </div>
-                      </div>
+                      </motion.div>
                     )}
-
-                    {/* Infusion */}
-                    {calculo.doseInfusaoMin !== undefined && (
-                      <div className="bg-black/30 p-3 rounded-xl border border-white/5">
-                        <p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-2 font-bold">{t('drugs.infusion')}</p>
-                        <div className="flex justify-between items-baseline">
-                          <p className="text-base font-mono text-white">
-                            {calculo.doseInfusaoMin.toFixed(1)}
-                            {calculo.doseInfusaoMin !== calculo.doseInfusaoMax ? ` – ${calculo.doseInfusaoMax?.toFixed(1)}` : ''}
-                            <span className="text-[10px] text-zinc-500 font-sans ml-1">{calculo.unidadeInfusao}</span>
-                          </p>
-                          <p className="text-lg font-mono font-bold text-purple-400">
-                            {calculo.taxaInfusaoMin?.toFixed(1)}
-                            {calculo.taxaInfusaoMin !== calculo.taxaInfusaoMax ? ` – ${calculo.taxaInfusaoMax?.toFixed(1)}` : ''}
-                            <span className="text-[10px] font-sans text-purple-500/60 ml-1">mL/h</span>
-                          </p>
-                        </div>
-                        {/* Dilution guide */}
-                        <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-white/5">
-                          <Droplets className="w-3 h-3 text-zinc-600 shrink-0" />
-                          <p className="text-[10px] text-zinc-600 font-mono leading-tight">
-                            {getDilucaoText(droga)}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Alert */}
-                    {calculo.alerta && (
-                      <div className="mt-auto flex items-start gap-2.5 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl">
-                        <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                        <p className="text-[11px] text-rose-300 leading-relaxed">{calculo.alerta}</p>
-                      </div>
-                    )}
-
-                    {/* Observations */}
-                    {droga.observacoes && !calculo.alerta && (
-                      <p className="mt-auto text-[10px] text-zinc-600 italic leading-relaxed">
-                        {droga.observacoes}
-                      </p>
-                    )}
-
-                    {/* Ampoule info (compact, no infusion) */}
-                    {calculo.doseInfusaoMin === undefined && (
-                      <div className="flex items-center gap-1.5 mt-auto pt-2 border-t border-white/5">
-                        <Droplets className="w-3 h-3 text-zinc-600 shrink-0" />
-                        <p className="text-[10px] text-zinc-600 font-mono">
-                          {getDilucaoText(droga)}
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
+                  </AnimatePresence>
                 </Card>
               </motion.div>
             );
