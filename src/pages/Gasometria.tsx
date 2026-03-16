@@ -66,6 +66,9 @@ export function Gasometria() {
   const [isScanning, setIsScanning] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [currentAvaliacaoId, setCurrentAvaliacaoId] = useState<string | null>(null);
+  const [warningDismissed, setWarningDismissed] = useState(() => {
+    return sessionStorage.getItem('gaso-warning-dismissed') === 'true';
+  });
   const addAvaliacao = useHistoryStore(state => state.addAvaliacao);
   const updateAvaliacao = useHistoryStore(state => state.updateAvaliacao);
   const setGasometriaSnapshot = useSessionStore(s => s.setGasometriaSnapshot);
@@ -185,6 +188,11 @@ ${resultado.causasProvaveis ? `\nCausas Prováveis: ${resultado.causasProvaveis}
     setIsCameraOpen(true);
   };
 
+  const handleDismissWarning = () => {
+    sessionStorage.setItem('gaso-warning-dismissed', 'true');
+    setWarningDismissed(true);
+  };
+
   const handleImageCapture = async (base64: string, mimeType: string) => {
     setIsCameraOpen(false);
     setIsScanning(true);
@@ -237,7 +245,35 @@ ${resultado.causasProvaveis ? `\nCausas Prováveis: ${resultado.causasProvaveis}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-7">
           <form id="gaso-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            
+
+            {/* Paired Sample Warning */}
+            <AnimatePresence>
+              {!warningDismissed && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+                  className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl"
+                >
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs text-amber-300 leading-relaxed font-medium">
+                      <span className="font-bold">Coleta pareada obrigatória.</span> As amostras arterial e venosa devem ser coletadas simultaneamente ou com intervalo máximo de 15 min. Gasometrias de momentos diferentes (horas ou dias) invalidam a análise comparativa.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDismissWarning}
+                    className="text-amber-500/50 hover:text-amber-400 transition-colors shrink-0 text-xs font-mono leading-none mt-0.5"
+                    aria-label="Dispensar aviso"
+                  >
+                    ✕
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Tabs Arterial / Venosa */}
             <div className="flex p-1 bg-black/40 border border-white/5 rounded-xl">
               <button
