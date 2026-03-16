@@ -5,7 +5,7 @@ import {
   Sparkles, UserCheck, FlaskConical, Zap, Brain,
   Heart, Shield, Syringe, Droplets, RotateCcw,
   ArrowLeftRight, User, ChevronDown, TriangleAlert,
-  ShoppingCart, Trash2, Minus,
+  Trash2, Minus,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
@@ -240,6 +240,7 @@ export function Drogas() {
   // Checklist state
   const [showChecklist, setShowChecklist] = useState(false);
   const [quantidades, setQuantidades] = useState<Record<string, number>>({});
+  const [dosesRaw, setDosesRaw] = useState<Record<string, string>>({});
   const [cenarioPrescricao, setCenarioPrescricao] = useState('Centro Cirúrgico');
   const [sugestaoPrescrição, setSugestaoPrescrição] = useState<string | null>(null);
   const [isSugerindoPrescricao, setIsSugerindoPrescricao] = useState(false);
@@ -266,6 +267,13 @@ export function Drogas() {
     }
   }, [pacienteContext]);
 
+  // ESC to close checklist
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowChecklist(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // Filtered drugs
   const drogasFiltradas = useMemo(() => {
     return DRUGS.filter(d => {
@@ -285,6 +293,12 @@ export function Drogas() {
     };
 
   const togglePrescricao = (droga: Droga) => {
+    // Init dose default when adding
+    setQuantidades(q => {
+      if (q[droga.nome] !== undefined) return q;
+      const defaultDose = droga.doseBolus?.min ?? droga.doseInfusao?.min ?? 1;
+      return { ...q, [droga.nome]: defaultDose };
+    });
     setPrescricao(prev => {
       const exists = prev.find(d => d.nome === droga.nome);
       const newPrescricao = exists ? prev.filter(d => d.nome !== droga.nome) : [...prev, droga];
@@ -475,6 +489,74 @@ export function Drogas() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Sugerir Prescrição por IA ─────────────────────────── */}
+      <div className="bg-black/40 border border-white/5 rounded-2xl p-4 space-y-3">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-1.5">
+          <Brain className="w-3 h-3" />
+          Sugerir Prescrição por IA
+        </p>
+        <div className="flex gap-2 items-end">
+          <select
+            value={cenarioPrescricao}
+            onChange={e => { setCenarioPrescricao(e.target.value); setSugestaoPrescrição(null); }}
+            className="flex-1 h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-zinc-200 text-sm focus:outline-none focus:border-purple-500/50 transition-colors"
+          >
+            {['Centro Cirúrgico', 'UTI', 'Emergência / Pronto-Socorro', 'Procedimento Ambulatorial', 'Sedação Diagnóstica'].map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <Button
+            onClick={handleSugerirPrescricao}
+            disabled={isSugerindoPrescricao}
+            className="h-10 bg-purple-600 hover:bg-purple-500 text-white shrink-0"
+          >
+            {isSugerindoPrescricao ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Brain className="w-4 h-4" />
+            )}
+          </Button>
+        </div>
+        {sugestaoPrescrição && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 rounded-2xl bg-black/40 border border-purple-500/20 space-y-3"
+          >
+            <p className="text-[10px] text-purple-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+              <Brain className="w-3 h-3" />
+              Sugestão de Prescrição — {cenarioPrescricao}
+            </p>
+            <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-purple-500 prose-strong:text-purple-300 prose-headings:text-purple-300">
+              <Markdown>{sugestaoPrescrição}</Markdown>
+            </div>
+            <AiDisclaimer />
+            {(() => {
+              const sugeridas = DRUGS.filter(d =>
+                sugestaoPrescrição.toLowerCase().includes(d.nome.toLowerCase())
+              );
+              if (sugeridas.length === 0) return null;
+              return (
+                <button
+                  onClick={() => {
+                    sugeridas.forEach(d => {
+                      if (!prescricao.find(p => p.nome === d.nome)) {
+                        togglePrescricao(d);
+                      }
+                    });
+                    setShowChecklist(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-sm font-semibold transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar à PM ({sugeridas.length} droga{sugeridas.length !== 1 ? 's' : ''})
+                </button>
+              );
+            })()}
+          </motion.div>
+        )}
+      </div>
 
       {/* ── Calculadoras (tabbed) ─────────────────────────────── */}
       <div className="bg-black/40 border border-white/5 rounded-2xl overflow-hidden">
@@ -719,24 +801,31 @@ export function Drogas() {
             exit={{ opacity: 0, scale: 0.8, y: 16 }}
             transition={{ type: 'spring', stiffness: 280, damping: 22 }}
             onClick={() => setShowChecklist(true)}
-            className="fixed bottom-24 right-6 h-11 px-4 rounded-full bg-cyan-500 text-black shadow-xl shadow-cyan-500/30 flex items-center gap-2 z-40 hover:bg-cyan-400 active:scale-95 transition-colors"
+            title="Prescrição atual"
+            className="fixed bottom-24 right-6 w-14 h-14 rounded-full bg-cyan-500 text-black shadow-xl shadow-cyan-500/30 flex items-center justify-center z-40 hover:bg-cyan-400 active:scale-95 transition-colors"
           >
-            <ShoppingCart className="w-5 h-5" />
-            <span className="text-sm font-bold">
-              {prescricao.length} {prescricao.length === 1 ? 'droga' : 'drogas'}
-            </span>
+            <Pill className="w-6 h-6" />
+            <motion.span
+              key={prescricao.length}
+              initial={{ scale: 1.5 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+              className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-black text-cyan-400 border border-cyan-500/50 flex items-center justify-center text-[10px] font-black"
+            >
+              {prescricao.length}
+            </motion.span>
             {interacoesLocais.some(i => i.severidade === 'critica') && (
-              <span className="w-2 h-2 rounded-full bg-rose-500 absolute -top-0.5 -right-0.5" />
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 border border-black absolute -bottom-0.5 -right-0.5" />
             )}
           </motion.button>
         )}
       </AnimatePresence>
 
-      {/* ── Checklist bottom sheet ─────────────────────────────── */}
+      {/* ── Checklist drawer (left) ────────────────────────────── */}
       <AnimatePresence>
         {showChecklist && (
           <>
-            {/* Overlay */}
+            {/* Overlay — click right side to close */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -745,21 +834,17 @@ export function Drogas() {
               className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm"
               onClick={() => setShowChecklist(false)}
             />
-            {/* Panel */}
+            {/* Panel — slides from left */}
             <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a] border-t border-white/10 rounded-t-3xl overflow-hidden"
-              style={{ maxHeight: '85vh' }}
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+              className="fixed top-0 left-0 bottom-0 z-50 bg-[#0a0a0a] border-r border-white/10 flex flex-col"
+              style={{ width: 'min(360px, 85vw)' }}
+              onClick={e => e.stopPropagation()}
             >
-              {/* Drag handle */}
-              <div className="flex justify-center pt-3 pb-1">
-                <div className="w-10 h-1 rounded-full bg-white/20" />
-              </div>
-
-              <div className="overflow-y-auto" style={{ maxHeight: 'calc(85vh - 32px)' }}>
+              <div className="overflow-y-auto flex-1">
                 <div className="p-5 space-y-5 pb-10">
                   {/* Header */}
                   <div className="flex items-start justify-between gap-3">
@@ -775,49 +860,84 @@ export function Drogas() {
                       </h2>
                       <p className="text-xs text-zinc-500 mt-0.5">{prescricao.length} medicamento(s)</p>
                     </div>
-                    <button
-                      onClick={() => setShowChecklist(false)}
-                      className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => {
+                          setPrescricao([]);
+                          setInteracoes(null);
+                          setSugestaoPrescrição(null);
+                          setProtocoloSelecionado(null);
+                          setQuantidades({});
+                          setDosesRaw({});
+                        }}
+                        className="h-8 px-3 rounded-full text-xs text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 border border-white/5 hover:border-rose-500/20 transition-all flex items-center gap-1.5"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        Limpar
+                      </button>
+                      <button
+                        onClick={() => setShowChecklist(false)}
+                        className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Drug list with quantity controls */}
+                  {/* Drug list with dose inputs */}
                   <div className="space-y-2">
                     {prescricao.map(droga => {
-                      const qty = quantidades[droga.nome] ?? 1;
+                      const bolus = droga.doseBolus;
+                      const infusao = droga.doseInfusao;
+                      const ref = bolus ?? (infusao ? { min: infusao.min, max: infusao.max, unidade: infusao.unidade } : null);
+                      const defaultDose = ref ? ref.min : 1;
+                      const dose = quantidades[droga.nome] ?? defaultDose;
+                      const isHigh = ref && dose > ref.max;
                       return (
-                        <div key={droga.nome} className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-white truncate">{droga.nome}</p>
-                            <span className={`inline-block px-1.5 py-0.5 mt-0.5 text-[9px] uppercase tracking-widest font-bold border rounded ${getDrugClassColor(droga.classe)}`}>
-                              {droga.classe}
-                            </span>
-                          </div>
-                          {/* Quantity controls */}
-                          <div className="flex items-center gap-1.5 shrink-0">
+                        <div key={droga.nome} className={`p-3 rounded-2xl border space-y-2 transition-colors ${isHigh ? 'bg-amber-500/5 border-amber-500/30' : 'bg-white/5 border-white/5'}`}>
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-white truncate">{droga.nome}</p>
+                              <span className={`inline-block px-1.5 py-0.5 mt-0.5 text-[9px] uppercase tracking-widest font-bold border rounded ${getDrugClassColor(droga.classe)}`}>
+                                {droga.classe}
+                              </span>
+                            </div>
+                            {/* Dose input */}
+                            {ref ? (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={ref.unidade.includes('mcg') ? 0.1 : 0.05}
+                                  value={dosesRaw[droga.nome] ?? String(dose)}
+                                  onChange={e => {
+                                    const raw = e.target.value;
+                                    setDosesRaw(r => ({ ...r, [droga.nome]: raw }));
+                                    const v = parseFloat(raw);
+                                    if (!isNaN(v)) setQuantidades(q => ({ ...q, [droga.nome]: v }));
+                                  }}
+                                  className={`w-16 h-8 px-2 rounded-lg border text-sm font-mono text-center bg-black/40 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isHigh ? 'border-amber-500/50 text-amber-300' : 'border-white/10 text-white focus:border-cyan-500/50'}`}
+                                />
+                                <span className="text-[10px] text-zinc-500 whitespace-nowrap">{ref.unidade}</span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-zinc-600 italic">sem dose padrão</span>
+                            )}
+                            {/* Remove */}
                             <button
-                              onClick={() => setQuantidades(q => ({ ...q, [droga.nome]: Math.max(1, (q[droga.nome] ?? 1) - 1) }))}
-                              className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                              onClick={() => togglePrescricao(droga)}
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
                             >
-                              <Minus className="w-3 h-3" />
-                            </button>
-                            <span className="text-sm font-mono text-white w-5 text-center">{qty}</span>
-                            <button
-                              onClick={() => setQuantidades(q => ({ ...q, [droga.nome]: (q[droga.nome] ?? 1) + 1 }))}
-                              className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
-                            >
-                              <Plus className="w-3 h-3" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
-                          {/* Remove */}
-                          <button
-                            onClick={() => togglePrescricao(droga)}
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {/* High dose warning */}
+                          {isHigh && (
+                            <div className="flex items-center gap-1.5 text-amber-400 text-[11px]">
+                              <TriangleAlert className="w-3 h-3 shrink-0" />
+                              <span>Dose acima do máximo recomendado ({ref!.max} {ref!.unidade})</span>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -892,69 +1012,26 @@ export function Drogas() {
                       </div>
                     )}
 
-                    {/* Sugerir prescrição por IA */}
-                    {pacienteContext && (
-                      <div className="space-y-2">
-                        <div className="flex gap-2 items-end">
-                          <div className="flex-1">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block">Cenário da Prescrição</label>
-                            <select
-                              value={cenarioPrescricao}
-                              onChange={e => { setCenarioPrescricao(e.target.value); setSugestaoPrescrição(null); }}
-                              className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-zinc-200 text-sm focus:outline-none focus:border-purple-500/50 transition-colors"
-                            >
-                              {['Centro Cirúrgico', 'UTI', 'Emergência / Pronto-Socorro', 'Procedimento Ambulatorial', 'Sedação Diagnóstica'].map(c => (
-                                <option key={c} value={c}>{c}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <Button
-                            onClick={handleSugerirPrescricao}
-                            disabled={isSugerindoPrescricao}
-                            className="h-10 bg-purple-600 hover:bg-purple-500 text-white shrink-0"
-                          >
-                            {isSugerindoPrescricao ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Brain className="w-4 h-4" />
-                            )}
-                          </Button>
+                    {/* Sugestão de prescrição (espelhada do bloco principal) */}
+                    {sugestaoPrescrição && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-4 rounded-2xl bg-black/40 border border-purple-500/20 space-y-3"
+                      >
+                        <p className="text-[10px] text-purple-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                          <Brain className="w-3 h-3" />
+                          Sugestão — {cenarioPrescricao}
+                        </p>
+                        <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-purple-500 prose-strong:text-purple-300 prose-headings:text-purple-300">
+                          <Markdown>{sugestaoPrescrição}</Markdown>
                         </div>
-                        {sugestaoPrescrição && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="p-4 rounded-2xl bg-black/40 border border-purple-500/20"
-                          >
-                            <p className="text-[10px] text-purple-400 uppercase tracking-widest font-bold flex items-center gap-1.5 mb-3">
-                              <Brain className="w-3 h-3" />
-                              Sugestão de Prescrição — {cenarioPrescricao}
-                            </p>
-                            <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-li:marker:text-purple-500 prose-strong:text-purple-300 prose-headings:text-purple-300">
-                              <Markdown>{sugestaoPrescrição}</Markdown>
-                            </div>
-                            <AiDisclaimer />
-                          </motion.div>
-                        )}
-                      </div>
+                        <AiDisclaimer />
+                      </motion.div>
                     )}
+
                   </div>
 
-                  {/* Clear all */}
-                  <button
-                    onClick={() => {
-                      setPrescricao([]);
-                      setInteracoes(null);
-                      setSugestaoPrescrição(null);
-                      setProtocoloSelecionado(null);
-                      setQuantidades({});
-                      setShowChecklist(false);
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-sm text-zinc-600 hover:text-rose-400 hover:bg-rose-500/5 border border-white/5 hover:border-rose-500/20 transition-all"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    Limpar prescrição
-                  </button>
                 </div>
               </div>
             </motion.div>
