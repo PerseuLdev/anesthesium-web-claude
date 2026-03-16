@@ -4,7 +4,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 export interface Avaliacao {
   id: string;
   data: string;
-  pacienteId: string; // código/leito
+  pacienteId: string; // código/leito ou nome do paciente
+  patientRecordId?: string; // links to Patient.id in patientStore
   tipo: 'Gasometria' | 'Drogas' | 'Escores' | 'Calculadoras' | 'Hemodinamica';
   dados: any;
   resultado: any;
