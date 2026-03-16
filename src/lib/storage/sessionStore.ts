@@ -17,6 +17,7 @@ export interface PacienteContext {
   altura?: number;
   idade?: number;
   sexo?: 'M' | 'F';
+  alergias?: string[];
   capturedAt: string; // ISO 8601
 }
 

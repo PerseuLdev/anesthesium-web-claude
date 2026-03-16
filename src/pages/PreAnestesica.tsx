@@ -147,6 +147,7 @@ export function PreAnestesica() {
   });
 
   const [fichaARISCAT, setFichaARISCAT] = useState<number | ''>('');
+  const [fichaAlergias, setFichaAlergias] = useState('');
   const [fichaAiSuggestion, setFichaAiSuggestion] = useState<string | null>(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
@@ -177,14 +178,19 @@ export function PreAnestesica() {
   // ── Save PacienteContext when ficha data changes ───────────────────────────
   useEffect(() => {
     if (fichaPeso && fichaAltura && fichaIdade) {
+      const alergiasParsed = fichaAlergias
+        .split(/[,;]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
       setPacienteContext({
         peso: Number(fichaPeso),
         altura: Number(fichaAltura),
         idade: Number(fichaIdade),
+        alergias: alergiasParsed.length > 0 ? alergiasParsed : undefined,
         capturedAt: new Date().toISOString(),
       });
     }
-  }, [fichaPeso, fichaAltura, fichaIdade, setPacienteContext]);
+  }, [fichaPeso, fichaAltura, fichaIdade, fichaAlergias, setPacienteContext]);
 
   // ── Auto-save on unmount ───────────────────────────────────────────────────
   const stateRef = useRef({ asa, mallampati, cormack, resApfel, resStopBang, resGoldman, lemonScore, obeseScore });
@@ -846,6 +852,13 @@ export function PreAnestesica() {
                   </span>
                 </div>
               )}
+              <Input
+                label="Alergias conhecidas"
+                type="text"
+                placeholder="Ex: Penicilina, Látex, AINH"
+                value={fichaAlergias}
+                onChange={(e) => setFichaAlergias(e.target.value)}
+              />
             </CardContent>
           </Card>
 
