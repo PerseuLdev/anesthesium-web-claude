@@ -1,14 +1,16 @@
 import React, { useRef } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { Activity, Pill, ClipboardCheck, History, LogOut, Heart, Scissors } from 'lucide-react';
+import { Activity, Pill, ClipboardCheck, History, UserRound, Heart, Scissors } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'motion/react';
 import { ConsentBanner } from './ConsentBanner';
+import { usePatientStore } from '../lib/storage/patientStore';
 
 export function Layout() {
   const { t } = useTranslation();
   const mainRef = useRef<HTMLElement>(null);
   const location = useLocation();
+  const currentPatient = usePatientStore((s) => s.currentPatient);
 
   const navItems = [
     { to: '/pre-anestesica', icon: ClipboardCheck, label: 'Avaliação' },
@@ -36,9 +38,15 @@ export function Layout() {
           </div>
           <h1 className="text-xl font-bold tracking-tight text-white">ANESTHESIUM</h1>
         </div>
-        <button className="w-10 h-10 rounded-full glass-panel flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-all active:scale-95">
-          <LogOut className="w-4 h-4" />
-        </button>
+        <NavLink
+          to="/paciente"
+          className="w-10 h-10 rounded-full glass-panel flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-all active:scale-95 relative"
+        >
+          <UserRound className="w-4 h-4" />
+          {currentPatient && (
+            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#050505]" />
+          )}
+        </NavLink>
       </header>
 
       {/* Main Content Area */}
