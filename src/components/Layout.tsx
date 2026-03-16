@@ -1,14 +1,14 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
-import { Activity, Pill, ClipboardCheck, History, LogOut, ArrowUp, Heart, Scissors } from 'lucide-react';
+import React, { useRef } from 'react';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Activity, Pill, ClipboardCheck, History, LogOut, Heart, Scissors } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { ConsentBanner } from './ConsentBanner';
 
 export function Layout() {
   const { t } = useTranslation();
   const mainRef = useRef<HTMLElement>(null);
-  const [showBackToTop, setShowBackToTop] = useState(false);
+  const location = useLocation();
 
   const navItems = [
     { to: '/pre-anestesica', icon: ClipboardCheck, label: 'Avaliação' },
@@ -19,14 +19,9 @@ export function Layout() {
     { to: '/historico', icon: History, label: t('common.history') },
   ];
 
-  const handleScroll = () => {
-    if (mainRef.current) {
-      setShowBackToTop(mainRef.current.scrollTop > 300);
-    }
-  };
-
-  const scrollToTop = () => {
-    if (mainRef.current) {
+  const handleNavClick = (to: string) => {
+    const isActive = location.pathname === to || location.pathname.startsWith(to + '/');
+    if (isActive && mainRef.current) {
       mainRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -47,30 +42,12 @@ export function Layout() {
       </header>
 
       {/* Main Content Area */}
-      <main 
+      <main
         ref={mainRef}
-        onScroll={handleScroll}
         className="flex-1 overflow-y-auto overflow-x-hidden relative pb-32 scroll-smooth"
       >
         <Outlet />
       </main>
-
-      {/* Back to Top Button */}
-      <AnimatePresence>
-        {showBackToTop && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0.8, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8, y: 20 }}
-            transition={{ type: "spring", stiffness: 200, damping: 20 }}
-            onClick={scrollToTop}
-            className="fixed bottom-24 right-6 w-12 h-12 rounded-full glass-panel flex items-center justify-center text-white hover:bg-white/10 transition-colors z-40 shadow-[0_0_20px_rgba(0,0,0,0.5)] active:scale-90"
-            aria-label="Voltar ao topo"
-          >
-            <ArrowUp className="w-5 h-5" />
-          </motion.button>
-        )}
-      </AnimatePresence>
 
       <ConsentBanner />
 
@@ -81,6 +58,7 @@ export function Layout() {
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={() => handleNavClick(item.to)}
               className={({ isActive }) =>
                 `relative flex items-center justify-center w-12 h-12 min-w-[3rem] rounded-full transition-all duration-300 ${
                   isActive
