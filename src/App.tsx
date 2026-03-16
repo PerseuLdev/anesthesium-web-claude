@@ -9,6 +9,8 @@ import { Layout } from './components/Layout';
 import { Gasometria } from './pages/Gasometria';
 import { Drogas } from './pages/Drogas';
 import { Escores } from './pages/Escores';
+import { PreAnestesica } from './pages/PreAnestesica';
+import { Navigate } from 'react-router-dom';
 import { Calculadoras } from './pages/Calculadoras';
 import { Historico } from './pages/Historico';
 import { Hemodinamica } from './pages/Hemodinamica';
@@ -23,7 +25,8 @@ export default function App() {
           <Route index element={<Gasometria />} />
           <Route path="gasometria" element={<Gasometria />} />
           <Route path="drogas" element={<Drogas />} />
-          <Route path="escores" element={<Escores />} />
+          <Route path="escores" element={<Navigate to="/pre-anestesica" replace />} />
+          <Route path="pre-anestesica" element={<PreAnestesica />} />
           <Route path="calculadoras" element={<Calculadoras />} />
           <Route path="historico" element={<Historico />} />
           <Route path="hemodinamica" element={<Hemodinamica />} />

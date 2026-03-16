@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { Activity, Pill, ClipboardList, History, LogOut, ArrowUp, Heart, Scissors } from 'lucide-react';
+import { Activity, Pill, ClipboardCheck, History, LogOut, ArrowUp, Heart, Scissors } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import { ConsentBanner } from './ConsentBanner';
@@ -11,7 +11,7 @@ export function Layout() {
   const [showBackToTop, setShowBackToTop] = useState(false);
 
   const navItems = [
-    { to: '/escores', icon: ClipboardList, label: t('common.scores') },
+    { to: '/pre-anestesica', icon: ClipboardCheck, label: 'Avaliação' },
     { to: '/cirurgias', icon: Scissors, label: 'Cirurgias' },
     { to: '/gasometria', icon: Activity, label: t('common.gasometry') },
     { to: '/hemodinamica', icon: Heart, label: 'Hemo' },
