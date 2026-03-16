@@ -14,6 +14,7 @@ import { interpretarGasometria, GasometriaInput, GasometriaOutput } from '../lib
 import { useHistoryStore } from '../lib/storage/historyStore';
 import { useDraftStore } from '../lib/storage/draftStore';
 import { useSessionStore } from '../lib/storage/sessionStore';
+import { usePatientStore } from '../lib/storage/patientStore';
 import { extractGasometriaFromImage } from '../lib/services/ocrService';
 import { generateClinicalPlan } from '../lib/services/clinicalAiService';
 import { CameraScanner } from '../components/CameraScanner';
@@ -72,6 +73,8 @@ export function Gasometria() {
   const addAvaliacao = useHistoryStore(state => state.addAvaliacao);
   const updateAvaliacao = useHistoryStore(state => state.updateAvaliacao);
   const setGasometriaSnapshot = useSessionStore(s => s.setGasometriaSnapshot);
+  const currentPatient = usePatientStore(s => s.currentPatient);
+  const addEvaluationToPatient = usePatientStore(s => s.addEvaluationToPatient);
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<GasometriaInput>({
     resolver: zodResolver(schema),
@@ -134,12 +137,14 @@ export function Gasometria() {
 
     // Auto-save
     const id = addAvaliacao({
-      pacienteId: `PAC-${Math.floor(Math.random() * 10000)}`,
+      pacienteId: currentPatient?.nome ?? `PAC-${Math.floor(Math.random() * 10000)}`,
+      patientRecordId: currentPatient?.id,
       tipo: 'Gasometria',
       dados: res.inputOriginal,
       resultado: res,
     });
     setCurrentAvaliacaoId(id);
+    if (currentPatient) addEvaluationToPatient(id);
   };
 
   const handleGenerateAiPlan = async () => {

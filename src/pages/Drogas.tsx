@@ -17,6 +17,7 @@ import { checkDrugInteractions, sugerirPrescricao } from '../lib/services/clinic
 import { detectarInteracoes } from '../constants/interacoes';
 import { useHistoryStore } from '../lib/storage/historyStore';
 import { useSessionStore } from '../lib/storage/sessionStore';
+import { usePatientStore } from '../lib/storage/patientStore';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
@@ -249,6 +250,8 @@ export function Drogas() {
   const [currentAvaliacaoId, setCurrentAvaliacaoId] = useState<string | null>(null);
   const addAvaliacao = useHistoryStore(state => state.addAvaliacao);
   const updateAvaliacao = useHistoryStore(state => state.updateAvaliacao);
+  const currentPatient = usePatientStore((s) => s.currentPatient);
+  const addEvaluationToPatient = usePatientStore((s) => s.addEvaluationToPatient);
 
   // Patient context from session
   const pacienteContext         = useSessionStore((s) => s.pacienteContext);
@@ -304,12 +307,14 @@ export function Drogas() {
       const newPrescricao = exists ? prev.filter(d => d.nome !== droga.nome) : [...prev, droga];
       if (!currentAvaliacaoId && newPrescricao.length > 0) {
         const id = addAvaliacao({
-          pacienteId: `PAC-${Math.floor(Math.random() * 10000)}`,
+          pacienteId: currentPatient?.nome ?? `PAC-${Math.floor(Math.random() * 10000)}`,
+          patientRecordId: currentPatient?.id,
           tipo: 'Drogas',
           dados: { peso, idade, tipo },
           resultado: { prescricao: newPrescricao, interacoes: null },
         });
         setCurrentAvaliacaoId(id);
+        if (currentPatient) addEvaluationToPatient(id);
       } else if (currentAvaliacaoId) {
         updateAvaliacao(currentAvaliacaoId, { resultado: { prescricao: newPrescricao, interacoes: null } });
       }

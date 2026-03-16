@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { useSessionStore, GasometriaSnapshot } from '../lib/storage/sessionStore';
+import { usePatientStore } from '../lib/storage/patientStore';
 
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
@@ -316,6 +317,8 @@ export function Hemodinamica() {
 
   const addAvaliacao = useHistoryStore((s) => s.addAvaliacao);
   const updateAvaliacao = useHistoryStore((s) => s.updateAvaliacao);
+  const currentPatient = usePatientStore((s) => s.currentPatient);
+  const addEvaluationToPatient = usePatientStore((s) => s.addEvaluationToPatient);
 
   const gasometriaSnapshot = useSessionStore((s) => s.gasometriaSnapshot);
   const bannerDismissed    = useSessionStore((s) => s.bannerDismissed);
@@ -372,12 +375,14 @@ export function Hemodinamica() {
       capturedAt: new Date().toISOString(),
     });
     const id = addAvaliacao({
-      pacienteId: `G3-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`,
+      pacienteId: currentPatient?.nome ?? `G3-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`,
+      patientRecordId: currentPatient?.id,
       tipo: 'Hemodinamica',
       dados: formData,
       resultado: res,
     });
     setCurrentAvaliacaoId(id);
+    if (currentPatient) addEvaluationToPatient(id);
   };
 
   const handleGenerateAi = async () => {

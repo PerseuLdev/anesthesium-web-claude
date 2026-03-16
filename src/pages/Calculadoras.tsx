@@ -13,6 +13,7 @@ import {
   calcularClearanceCreatinina
 } from '../lib/clinical/calculadoras';
 import { useHistoryStore } from '../lib/storage/historyStore';
+import { usePatientStore } from '../lib/storage/patientStore';
 import { useSessionStore } from '../lib/storage/sessionStore';
 
 export function Calculadoras() {
@@ -60,18 +61,21 @@ export function Calculadoras() {
 
   // Auto-save on unmount if changed from defaults
   const addAvaliacao = useHistoryStore(state => state.addAvaliacao);
-  const stateRef = React.useRef({ numAltura, numPeso, numIdade, sexo, numCreatinina, ibw, abw, vc, bsa, imc, crcl });
+  const currentPatient = usePatientStore((s) => s.currentPatient);
+  const addEvaluationToPatient = usePatientStore((s) => s.addEvaluationToPatient);
+  const stateRef = React.useRef({ numAltura, numPeso, numIdade, sexo, numCreatinina, ibw, abw, vc, bsa, imc, crcl, currentPatient, addEvaluationToPatient });
 
   React.useEffect(() => {
-    stateRef.current = { numAltura, numPeso, numIdade, sexo, numCreatinina, ibw, abw, vc, bsa, imc, crcl };
-  }, [numAltura, numPeso, numIdade, sexo, numCreatinina, ibw, abw, vc, bsa, imc, crcl]);
+    stateRef.current = { numAltura, numPeso, numIdade, sexo, numCreatinina, ibw, abw, vc, bsa, imc, crcl, currentPatient, addEvaluationToPatient };
+  }, [numAltura, numPeso, numIdade, sexo, numCreatinina, ibw, abw, vc, bsa, imc, crcl, currentPatient, addEvaluationToPatient]);
 
   React.useEffect(() => {
     return () => {
       const current = stateRef.current;
       if (current.numAltura !== 170 || current.numPeso !== 70 || current.numIdade !== 40 || current.numCreatinina !== 1.0) {
-        addAvaliacao({
-          pacienteId: `PAC-${Math.floor(Math.random() * 10000)}`,
+        const id = addAvaliacao({
+          pacienteId: current.currentPatient?.nome ?? `PAC-${Math.floor(Math.random() * 10000)}`,
+          patientRecordId: current.currentPatient?.id,
           tipo: 'Calculadoras',
           dados: {
             altura: current.numAltura,
@@ -89,6 +93,7 @@ export function Calculadoras() {
             crcl: current.crcl
           }
         });
+        if (current.currentPatient) current.addEvaluationToPatient(id);
       }
     };
   }, [addAvaliacao]);

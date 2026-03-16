@@ -21,6 +21,7 @@ import { ASA_CLASSES, MALLAMPATI_CLASSES, CORMACK_LEHANE_CLASSES } from '../cons
 import { calcularApfel, calcularStopBang, calcularGoldman } from '../lib/clinical/escores';
 import { useHistoryStore } from '../lib/storage/historyStore';
 import { useSessionStore } from '../lib/storage/sessionStore';
+import { usePatientStore } from '../lib/storage/patientStore';
 import { gerarFichaAnestesica, DadosFichaAnestesica } from '../lib/services/clinicalAiService';
 import { MEDICACOES_PERIOP } from '../constants/medicacoesPerio';
 import Markdown from 'react-markdown';
@@ -158,6 +159,8 @@ export function PreAnestesica() {
   // ── Session / History stores ───────────────────────────────────────────────
   const setPacienteContext = useSessionStore((s) => s.setPacienteContext);
   const addAvaliacao = useHistoryStore((s) => s.addAvaliacao);
+  const currentPatient = usePatientStore((s) => s.currentPatient);
+  const addEvaluationToPatient = usePatientStore((s) => s.addEvaluationToPatient);
 
   // ── Computed: Tab 1 ────────────────────────────────────────────────────────
   const resApfel = calcularApfel(apfel);
@@ -174,6 +177,20 @@ export function PreAnestesica() {
   const fichaLemonScore = Object.values(fichaLEMON).filter(Boolean).length;
   const fichaObeseScore = Object.values(fichaOBESE).filter(Boolean).length;
   const fichaRCRIScore = Object.values(fichaRCRI).filter(Boolean).length;
+
+  // ── Pre-populate ficha from patientStore when patient changes ─────────────
+  useEffect(() => {
+    if (currentPatient) {
+      if (currentPatient.idade != null) setFichaIdade(currentPatient.idade);
+      if (currentPatient.peso != null) setFichaPeso(currentPatient.peso);
+      if (currentPatient.altura != null) setFichaAltura(currentPatient.altura);
+      if (currentPatient.alergias?.length) {
+        setFichaAlergias(currentPatient.alergias.join(', '));
+      }
+      // NOTE: ASA, Mallampati, Cormack are NOT auto-filled — require clinical evaluation
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPatient?.id]);
 
   // ── Save PacienteContext when ficha data changes ───────────────────────────
   useEffect(() => {
@@ -193,11 +210,11 @@ export function PreAnestesica() {
   }, [fichaPeso, fichaAltura, fichaIdade, fichaAlergias, setPacienteContext]);
 
   // ── Auto-save on unmount ───────────────────────────────────────────────────
-  const stateRef = useRef({ asa, mallampati, cormack, resApfel, resStopBang, resGoldman, lemonScore, obeseScore });
+  const stateRef = useRef({ asa, mallampati, cormack, resApfel, resStopBang, resGoldman, lemonScore, obeseScore, currentPatient, addEvaluationToPatient });
 
   useEffect(() => {
-    stateRef.current = { asa, mallampati, cormack, resApfel, resStopBang, resGoldman, lemonScore, obeseScore };
-  }, [asa, mallampati, cormack, resApfel, resStopBang, resGoldman, lemonScore, obeseScore]);
+    stateRef.current = { asa, mallampati, cormack, resApfel, resStopBang, resGoldman, lemonScore, obeseScore, currentPatient, addEvaluationToPatient };
+  }, [asa, mallampati, cormack, resApfel, resStopBang, resGoldman, lemonScore, obeseScore, currentPatient, addEvaluationToPatient]);
 
   useEffect(() => {
     return () => {
@@ -210,8 +227,9 @@ export function PreAnestesica() {
         c.lemonScore > 0 ||
         c.obeseScore > 0
       ) {
-        addAvaliacao({
-          pacienteId: `PAC-${Math.floor(Math.random() * 10000)}`,
+        const id = addAvaliacao({
+          pacienteId: c.currentPatient?.nome ?? `PAC-${Math.floor(Math.random() * 10000)}`,
+          patientRecordId: c.currentPatient?.id,
           tipo: 'Escores',
           dados: {
             asa: c.asa.id,
@@ -226,6 +244,7 @@ export function PreAnestesica() {
             goldman: c.resGoldman,
           },
         });
+        if (c.currentPatient) c.addEvaluationToPatient(id);
       }
     };
   }, [addAvaliacao]);
