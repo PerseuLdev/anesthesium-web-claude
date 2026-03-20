@@ -257,6 +257,15 @@ export function PreAnestesica() {
       })
     : MEDICACOES_PERIOP;
 
+  // ── Patient medications matched against periop guide ─────────────────────
+  const pacienteMeds = currentPatient?.medicamentosEmUso ?? [];
+  const pacienteMedsComManejo = pacienteMeds.map((nome) => {
+    const match = MEDICACOES_PERIOP.find((m) =>
+      m.drogas.some((d) => normalizeStr(d) === normalizeStr(nome))
+    );
+    return { nome, match: match ?? null };
+  });
+
   // ── Manejo color helpers ───────────────────────────────────────────────────
   const manejoColor = {
     MANTER: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
@@ -988,6 +997,45 @@ export function PreAnestesica() {
           transition={{ duration: 0.25 }}
           className="space-y-4"
         >
+          {/* Patient medications panel */}
+          {pacienteMedsComManejo.length > 0 && (
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 overflow-hidden">
+              <div className="px-4 py-3 border-b border-amber-500/10 flex items-center gap-2">
+                <Pill className="w-3.5 h-3.5 text-amber-400" />
+                <p className="text-xs font-semibold text-amber-300 uppercase tracking-widest">
+                  Medicamentos do paciente
+                </p>
+              </div>
+              <div className="divide-y divide-white/5">
+                {pacienteMedsComManejo.map(({ nome, match }) => (
+                  <div key={nome} className="px-4 py-3 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-white">{nome}</span>
+                      {match ? (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-widest border ${manejoColor[match.manejo]}`}>
+                          {match.manejo}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-widest border border-zinc-600/40 bg-zinc-500/15 text-zinc-400">
+                          Não catalogado
+                        </span>
+                      )}
+                    </div>
+                    {match && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-zinc-500">{match.classe}</p>
+                        <p className="text-xs text-zinc-300 leading-relaxed">{match.manejoTexto}</p>
+                      </div>
+                    )}
+                    {!match && (
+                      <p className="text-xs text-zinc-600">Consulte o protocolo institucional.</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />

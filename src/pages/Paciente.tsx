@@ -12,14 +12,17 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
+  Trash2,
+  Eye,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { usePatientStore } from '../lib/storage/patientStore';
-import { useHistoryStore } from '../lib/storage/historyStore';
+import { useHistoryStore, Avaliacao } from '../lib/storage/historyStore';
 import { useSessionStore } from '../lib/storage/sessionStore';
+import { AvaliacaoDetailModal } from '../components/AvaliacaoDetailModal';
 
 const TIPO_COLORS: Record<string, string> = {
   Gasometria: 'bg-emerald-500/20 text-emerald-400',
@@ -29,30 +32,181 @@ const TIPO_COLORS: Record<string, string> = {
   Hemodinamica: 'bg-amber-500/20 text-amber-400',
 };
 
-function avaliacaoSummary(a: any): string {
-  if (a.tipo === 'Gasometria' && a.resultado?.disturbioPrimario) {
-    return `${a.resultado.disturbioPrimario}`;
-  }
-  if (a.tipo === 'Drogas' && a.resultado?.prescricao?.length) {
-    return `${a.resultado.prescricao.length} med.`;
-  }
-  if (a.tipo === 'Escores' && a.dados?.asa) {
-    return `ASA ${a.dados.asa}`;
-  }
-  if (a.tipo === 'Hemodinamica' && a.resultado?.hemo?.choque) {
-    return `Choque ${a.resultado.hemo.choque}`;
-  }
-  return '';
+// ── Chip helpers ─────────────────────────────────────────────────────────────
+
+interface Chip {
+  label: string;
+  value: string;
+  abnormal?: boolean;
+  className?: string;
 }
+
+function getAvaliacaoChips(a: Avaliacao): Chip[] {
+  if (a.tipo === 'Gasometria') {
+    const chips: Chip[] = [];
+    const pH = a.resultado?.inputOriginal?.pH;
+    const ag = a.resultado?.anionGap;
+    const sev = a.resultado?.severidade;
+    if (pH != null) {
+      chips.push({ label: 'pH', value: String(pH), abnormal: pH < 7.35 || pH > 7.45 });
+    }
+    if (sev) {
+      const sevClass =
+        sev === 'Grave' ? 'bg-rose-500/15 border-rose-500/30 text-rose-400' :
+        sev === 'Moderada' ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' :
+        sev === 'Leve' ? 'bg-yellow-500/15 border-yellow-500/30 text-yellow-400' :
+        'bg-emerald-500/15 border-emerald-500/30 text-emerald-400';
+      chips.push({ label: '', value: sev, className: sevClass });
+    }
+    if (ag != null && ag > 12) {
+      chips.push({ label: 'AG', value: `${ag.toFixed(0)}`, abnormal: true });
+    }
+    return chips;
+  }
+
+  if (a.tipo === 'Drogas') {
+    const chips: Chip[] = [];
+    const count = a.resultado?.prescricao?.length ?? 0;
+    const peso = a.dados?.peso;
+    if (count > 0) chips.push({ label: '', value: `${count} med.` });
+    if (peso != null) chips.push({ label: '', value: `${peso} kg` });
+    return chips;
+  }
+
+  if (a.tipo === 'Escores') {
+    const chips: Chip[] = [];
+    const asa = a.dados?.asa;
+    const m = a.dados?.mallampati;
+    const c = a.dados?.cormack;
+    const apfel = a.resultado?.apfel?.probabilidade;
+    if (asa) chips.push({ label: 'ASA', value: String(asa) });
+    if (m != null && c != null) chips.push({ label: '', value: `M${m}/C${c}` });
+    if (apfel != null) chips.push({ label: 'Apfel', value: `${apfel}%`, abnormal: apfel >= 60 });
+    return chips;
+  }
+
+  if (a.tipo === 'Calculadoras') {
+    const chips: Chip[] = [];
+    const imc = a.resultado?.imc;
+    const ibw = a.resultado?.ibw;
+    const vc = a.resultado?.vc;
+    if (imc != null) chips.push({ label: 'IMC', value: imc.toFixed(1) });
+    if (ibw != null) chips.push({ label: 'IBW', value: `${ibw.toFixed(1)} kg` });
+    if (vc != null) chips.push({ label: 'VC', value: `${vc.toFixed(0)} mL` });
+    return chips;
+  }
+
+  if (a.tipo === 'Hemodinamica') {
+    const chips: Chip[] = [];
+    const choque = a.resultado?.hemo?.choque;
+    if (choque) {
+      chips.push({ label: 'Choque', value: choque, abnormal: true });
+    }
+    return chips;
+  }
+
+  return [];
+}
+
+function getAvaliacaoSubtext(a: Avaliacao): string | null {
+  if (a.tipo === 'Gasometria' && a.resultado?.disturbioPrimario) {
+    return a.resultado.disturbioPrimario;
+  }
+  if (a.tipo === 'Drogas' && a.resultado?.prescricao?.length > 0) {
+    const nomes: string[] = a.resultado.prescricao.map((d: any) => d.nome as string);
+    const max = 3;
+    const visible = nomes.slice(0, max);
+    const rest = nomes.length - max;
+    return rest > 0 ? `${visible.join('  ·  ')}  +${rest}` : visible.join('  ·  ');
+  }
+  return null;
+}
+
+// ── AvaliacaoMiniCard ────────────────────────────────────────────────────────
+
+function AvaliacaoMiniCard({
+  avaliacao,
+  onView,
+  onDelete,
+}: {
+  avaliacao: Avaliacao;
+  onView: () => void;
+  onDelete: () => void;
+}) {
+  const chips = getAvaliacaoChips(avaliacao);
+  const subtext = getAvaliacaoSubtext(avaliacao);
+  const hasDetails = chips.length > 0 || subtext;
+
+  return (
+    <div className="px-4 py-3 space-y-2">
+      {/* Row 1: type badge + timestamp + actions */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${TIPO_COLORS[avaliacao.tipo] ?? 'bg-zinc-500/20 text-zinc-400'}`}>
+            {avaliacao.tipo}
+          </span>
+          <span className="text-[10px] text-zinc-600 shrink-0">
+            {format(new Date(avaliacao.data), 'dd/MM HH:mm')}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={onView}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white text-[10px] font-medium transition-colors active:scale-95"
+          >
+            <Eye className="w-3 h-3" />
+            Ver
+          </button>
+          <button
+            onClick={onDelete}
+            className="p-1 rounded-lg text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors active:scale-95"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+
+      {/* Row 2: chips + subtext */}
+      {hasDetails && (
+        <div className="space-y-1">
+          {chips.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {chips.map((chip, i) => (
+                <span
+                  key={i}
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-mono border ${
+                    chip.className
+                      ? chip.className
+                      : chip.abnormal
+                        ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                        : 'bg-white/5 border-white/10 text-zinc-300'
+                  }`}
+                >
+                  {chip.label ? `${chip.label}: ${chip.value}` : chip.value}
+                </span>
+              ))}
+            </div>
+          )}
+          {subtext && (
+            <p className="text-xs text-zinc-400 leading-snug">{subtext}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main page ────────────────────────────────────────────────────────────────
 
 export function Paciente() {
   const navigate = useNavigate();
   const { currentPatient, clearCurrentPatient } = usePatientStore();
-  const avaliacoes = useHistoryStore((s) => s.avaliacoes);
+  const { avaliacoes, removeAvaliacao } = useHistoryStore();
   const gasometriaSnapshot = useSessionStore((s) => s.gasometriaSnapshot);
 
   const [fichaExpanded, setFichaExpanded] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [selectedAvaliacao, setSelectedAvaliacao] = useState<Avaliacao | null>(null);
 
   const linkedAvaliacoes = currentPatient
     ? avaliacoes.filter((a) => currentPatient.avaliacaoIds.includes(a.id))
@@ -181,6 +335,20 @@ export function Paciente() {
                 </div>
               )}
 
+              {/* Medicamentos em uso */}
+              {currentPatient.medicamentosEmUso && currentPatient.medicamentosEmUso.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1.5">Medicamentos em uso</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {currentPatient.medicamentosEmUso.map((m) => (
+                      <span key={m} className="px-2 py-0.5 rounded-md text-xs bg-amber-500/15 border border-amber-500/30 text-amber-300">
+                        {m}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Cirurgia planejada */}
               {currentPatient.cirurgiaPlaneada && (
                 <div>
@@ -275,29 +443,19 @@ export function Paciente() {
                   </p>
                 </div>
                 <div className="divide-y divide-white/5">
-                  {linkedAvaliacoes.map((a) => {
-                    const summary = avaliacaoSummary(a);
-                    return (
-                      <div key={a.id} className="flex items-center justify-between px-4 py-3 gap-3">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${TIPO_COLORS[a.tipo] ?? 'bg-zinc-500/20 text-zinc-400'}`}>
-                            {a.tipo}
-                          </span>
-                          {summary && (
-                            <span className="text-xs text-zinc-400 truncate">{summary}</span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-zinc-600 shrink-0">
-                          {format(new Date(a.data), 'dd/MM HH:mm')}
-                        </span>
-                      </div>
-                    );
-                  })}
+                  {linkedAvaliacoes.map((a) => (
+                    <AvaliacaoMiniCard
+                      key={a.id}
+                      avaliacao={a}
+                      onView={() => setSelectedAvaliacao(a)}
+                      onDelete={() => removeAvaliacao(a.id)}
+                    />
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* AI summary (if archived patient was restored — unlikely for currentPatient, but defensive) */}
+            {/* AI summary (if archived patient was restored) */}
             {currentPatient.aiSummary && (
               <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 overflow-hidden">
                 <button
@@ -332,6 +490,16 @@ export function Paciente() {
           </motion.div>
         )}
       </div>
+
+      {/* Detail modal */}
+      <AnimatePresence>
+        {selectedAvaliacao && (
+          <AvaliacaoDetailModal
+            avaliacao={selectedAvaliacao}
+            onClose={() => setSelectedAvaliacao(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

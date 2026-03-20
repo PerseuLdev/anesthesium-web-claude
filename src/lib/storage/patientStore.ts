@@ -9,6 +9,7 @@ export interface Patient {
   altura?: number;
   sexo?: 'M' | 'F';
   alergias?: string[];
+  medicamentosEmUso?: string[];
   fichaPreAnestesica?: string;
   cirurgiaPlaneada?: string;
   createdAt: string;

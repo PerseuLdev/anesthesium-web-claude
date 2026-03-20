@@ -26,12 +26,15 @@ export function NovoPatiente() {
   const [sexo, setSexo] = useState<'M' | 'F' | ''>('');
   const [alergias, setAlergias] = useState<string[]>([]);
   const [alergiaInput, setAlergiaInput] = useState('');
+  const [medicamentos, setMedicamentos] = useState<string[]>([]);
+  const [medicamentoInput, setMedicamentoInput] = useState('');
   const [fichaPreAnestesica, setFichaPreAnestesica] = useState('');
   const [cirurgiaPlaneada, setCirurgiaPlaneada] = useState('');
   const [nomeError, setNomeError] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const alergiaInputRef = useRef<HTMLInputElement>(null);
+  const medicamentoInputRef = useRef<HTMLInputElement>(null);
 
   const addAlergia = (value: string) => {
     const trimmed = value.trim();
@@ -52,6 +55,27 @@ export function NovoPatiente() {
 
   const removeAlergia = (a: string) => {
     setAlergias((prev) => prev.filter((x) => x !== a));
+  };
+
+  const addMedicamento = (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed && !medicamentos.includes(trimmed)) {
+      setMedicamentos((prev) => [...prev, trimmed]);
+    }
+    setMedicamentoInput('');
+  };
+
+  const handleMedicamentoKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addMedicamento(medicamentoInput);
+    } else if (e.key === 'Backspace' && medicamentoInput === '' && medicamentos.length > 0) {
+      setMedicamentos((prev) => prev.slice(0, -1));
+    }
+  };
+
+  const removeMedicamento = (m: string) => {
+    setMedicamentos((prev) => prev.filter((x) => x !== m));
   };
 
   const handleSave = async () => {
@@ -83,6 +107,7 @@ export function NovoPatiente() {
         altura: altura ? Number(altura) : undefined,
         sexo: sexo || undefined,
         alergias: alergias.length > 0 ? alergias : undefined,
+        medicamentosEmUso: medicamentos.length > 0 ? medicamentos : undefined,
         fichaPreAnestesica: fichaPreAnestesica.trim() || undefined,
         cirurgiaPlaneada: cirurgiaPlaneada.trim() || undefined,
       });
@@ -266,6 +291,38 @@ export function NovoPatiente() {
           </div>
         </div>
 
+        {/* Medicamentos em uso */}
+        <div>
+          <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Medicamentos em uso</label>
+          <div
+            onClick={() => medicamentoInputRef.current?.focus()}
+            className="min-h-[42px] w-full px-3 py-2 rounded-xl bg-zinc-900/80 border border-white/10 focus-within:ring-1 focus-within:ring-violet-500/40 focus-within:border-violet-500/40 transition-colors flex flex-wrap gap-1.5 items-center cursor-text"
+          >
+            {medicamentos.map((m) => (
+              <span key={m} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs">
+                {m}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); removeMedicamento(m); }}
+                  className="hover:text-amber-100 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+            <input
+              ref={medicamentoInputRef}
+              type="text"
+              value={medicamentoInput}
+              onChange={(e) => setMedicamentoInput(e.target.value)}
+              onKeyDown={handleMedicamentoKeyDown}
+              onBlur={() => { if (medicamentoInput.trim()) addMedicamento(medicamentoInput); }}
+              placeholder={medicamentos.length === 0 ? 'Ex: Metformina, Losartana... (Enter ou vírgula)' : ''}
+              className="flex-1 min-w-[100px] bg-transparent text-sm text-white placeholder:text-zinc-600 outline-none"
+            />
+          </div>
+        </div>
+
         {/* Ficha pré-anestésica */}
         <div>
           <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">
@@ -274,7 +331,7 @@ export function NovoPatiente() {
           <textarea
             value={fichaPreAnestesica}
             onChange={(e) => setFichaPreAnestesica(e.target.value)}
-            placeholder="Comorbidades, histórico, medicações em uso, observações relevantes..."
+            placeholder="Comorbidades, histórico, observações relevantes..."
             rows={4}
             className="w-full px-3 py-2.5 rounded-xl bg-zinc-900/80 border border-white/10 text-sm text-white placeholder:text-zinc-600 outline-none focus:ring-1 focus:ring-violet-500/40 focus:border-violet-500/40 transition-colors resize-none leading-relaxed"
           />
