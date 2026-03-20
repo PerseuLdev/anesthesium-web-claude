@@ -39,7 +39,8 @@ export default function App() {
           <Route path="calculadoras" element={<Calculadoras />} />
           <Route path="historico" element={<Historico />} />
           <Route path="hemodinamica" element={<Hemodinamica />} />
-          <Route path="cirurgias" element={<Cirurgias />} />
+          <Route path="guias" element={<Cirurgias />} />
+          <Route path="cirurgias" element={<Navigate to="/guias" replace />} />
           <Route path="paciente" element={<Paciente />} />
           <Route path="paciente/novo" element={<NovoPatiente />} />
           <Route path="paciente/editar" element={<EditarPaciente />} />

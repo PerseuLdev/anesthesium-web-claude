@@ -6,8 +6,10 @@ import {
   CircleDot, Eye, Sparkles, GitBranch,
   Search, ChevronDown, ChevronUp, ArrowLeft,
   Send, Loader2, Copy, Check, X,
+  Scissors, AlertTriangle,
 } from 'lucide-react';
 import { BANCO_CIRURGIAS, ESPECIALIDADES, GuiaCirurgico, Especialidade } from '../constants/cirurgias';
+import { COMPLICACOES } from '../constants/complicacoes';
 import { consultarCirurgia } from '../lib/services/clinicalAiService';
 import { useSessionStore } from '../lib/storage/sessionStore';
 import { AiDisclaimer } from '../components/AiDisclaimer';
@@ -293,8 +295,125 @@ function SpecialtyCard({ name, count, active, onSelect }: SpecialtyCardProps) {
   );
 }
 
+// ── Complications view ────────────────────────────────────────
+const COR_MAP = {
+  rose:  {
+    ativo:  'border-rose-500/40 bg-rose-500/10 text-rose-400',
+    inativo: 'border-white/5 bg-white/3 text-zinc-500 hover:text-zinc-300 hover:border-white/10',
+  },
+  amber: {
+    ativo:  'border-amber-500/40 bg-amber-500/10 text-amber-400',
+    inativo: 'border-white/5 bg-white/3 text-zinc-500 hover:text-zinc-300 hover:border-white/10',
+  },
+  blue:  {
+    ativo:  'border-blue-500/40 bg-blue-500/10 text-blue-400',
+    inativo: 'border-white/5 bg-white/3 text-zinc-500 hover:text-zinc-300 hover:border-white/10',
+  },
+} as const;
+
+function ComplicacoesView() {
+  const [catIdx, setCatIdx] = useState(0);
+  const [openIdx, setOpenIdx] = useState<number | null>(0);
+
+  const categoria = COMPLICACOES[catIdx];
+
+  const handleCatChange = (idx: number) => {
+    setCatIdx(idx);
+    setOpenIdx(0);
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Title */}
+      <div>
+        <h1 className="text-2xl font-bold text-white tracking-tight">Complicações Anestésicas</h1>
+        <p className="text-sm text-zinc-500 mt-1">Guia rápido de conduta · ASA · ESAIC · ASRA</p>
+      </div>
+
+      {/* Category tabs */}
+      <div className="flex flex-col gap-2 sm:flex-row">
+        {COMPLICACOES.map((cat, idx) => (
+          <button
+            key={cat.nome}
+            onClick={() => handleCatChange(idx)}
+            className={`flex-1 px-3 py-2.5 rounded-xl border text-xs font-bold uppercase tracking-widest transition-all ${
+              catIdx === idx ? COR_MAP[cat.cor].ativo : COR_MAP[cat.cor].inativo
+            }`}
+          >
+            {cat.nome}
+          </button>
+        ))}
+      </div>
+
+      {/* Complication accordions */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={catIdx}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          className="glass-panel rounded-2xl overflow-hidden divide-y divide-white/5"
+        >
+          {categoria.complicacoes.map((comp, idx) => (
+            <div key={comp.nome}>
+              <button
+                onClick={() => setOpenIdx(openIdx === idx ? null : idx)}
+                className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-white/5 transition-colors"
+              >
+                <span className="text-sm font-medium text-zinc-200 leading-snug pr-3">{comp.nome}</span>
+                {openIdx === idx
+                  ? <ChevronUp className="w-4 h-4 text-zinc-500 shrink-0" />
+                  : <ChevronDown className="w-4 h-4 text-zinc-500 shrink-0" />}
+              </button>
+
+              <AnimatePresence initial={false}>
+                {openIdx === idx && (
+                  <motion.div
+                    key="body"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-4 pb-1 grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      {[
+                        { label: 'Definição', value: comp.definicao },
+                        { label: 'Cenário Típico', value: comp.cenario },
+                        { label: 'Prevenção', value: comp.prevencao },
+                        { label: 'Solução / Tratamento', value: comp.solucao },
+                      ].map(field => (
+                        <div key={field.label} className="space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                            {field.label}
+                          </p>
+                          <p className="text-xs text-zinc-300 leading-relaxed">{field.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mx-4 mb-4 mt-3 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                      <p className="text-xs text-amber-300 leading-relaxed">
+                        <span className="font-bold">Dica Clínica · </span>
+                        {comp.extra}
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ))}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────
+type ModuleTab = 'cirurgias' | 'complicacoes';
+
 export function Cirurgias() {
+  const [moduleTab, setModuleTab] = useState<ModuleTab>('cirurgias');
   const [search, setSearch] = useState('');
   const [selectedEsp, setSelectedEsp] = useState<Especialidade | null>(null);
   const [selectedCirurgia, setSelectedCirurgia] = useState<GuiaCirurgico | null>(null);
@@ -357,145 +476,179 @@ export function Cirurgias() {
   }, [selectedCirurgia]);
 
   return (
-    <div className="px-4 pt-2 pb-8 space-y-6 max-w-2xl mx-auto">
-      {/* Title */}
-      <div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">Guia Cirúrgico</h1>
-        <p className="text-sm text-zinc-500 mt-1">Escolha a especialidade e a cirurgia</p>
+    <div className="px-4 pt-6 pb-8 space-y-6 max-w-2xl mx-auto">
+      {/* Module switcher */}
+      <div className="flex p-1 bg-black/40 border border-white/5 rounded-xl">
+        <button
+          onClick={() => setModuleTab('cirurgias')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold uppercase tracking-widest rounded-lg transition-all ${
+            moduleTab === 'cirurgias'
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+              : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5 border border-transparent'
+          }`}
+        >
+          <Scissors className="w-4 h-4" />
+          <span>Guia Cirúrgico</span>
+        </button>
+        <button
+          onClick={() => setModuleTab('complicacoes')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold uppercase tracking-widest rounded-lg transition-all ${
+            moduleTab === 'complicacoes'
+              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+              : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5 border border-transparent'
+          }`}
+        >
+          <AlertTriangle className="w-4 h-4" />
+          <span>Complicações</span>
+        </button>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-        <input
-          type="text"
-          value={search}
-          onChange={e => {
-            setSearch(e.target.value);
-            if (e.target.value.trim()) setSelectedCirurgia(null);
-          }}
-          placeholder="Buscar cirurgia ou problema... (ex: vasoplegia)"
-          className="w-full bg-white/5 border border-white/8 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-white/20 transition-colors"
-        />
-        {search && (
-          <button
-            onClick={() => setSearch('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
-      </div>
+      {/* Complications tab */}
+      {moduleTab === 'complicacoes' && <ComplicacoesView />}
 
-      {/* Specialty grid — hide when searching */}
-      <AnimatePresence>
-        {!search.trim() && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-3">Especialidade</p>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-              {ESPECIALIDADES.map(esp => (
-                <SpecialtyCard
-                  key={esp}
-                  name={esp}
-                  count={countByEsp[esp] ?? 0}
-                  active={selectedEsp === esp}
-                  onSelect={() => handleSelectEsp(esp)}
-                />
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Surgical guide tab */}
+      {moduleTab === 'cirurgias' && (
+        <>
+          {/* Title */}
+          <div>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Guia Cirúrgico</h1>
+            <p className="text-sm text-zinc-500 mt-1">Escolha a especialidade e a cirurgia</p>
+          </div>
 
-      {/* Surgery list */}
-      <AnimatePresence mode="wait">
-        {displayList.length > 0 && (
-          <motion.div
-            key={search + (selectedEsp ?? '')}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="space-y-3"
-          >
-            {/* Back button when specialty is selected */}
-            {selectedEsp && !search.trim() && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => { setSelectedEsp(null); setSelectedCirurgia(null); }}
-                  className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  Voltar
-                </button>
-                <span className="text-xs text-zinc-600">·</span>
-                <span className="text-xs text-zinc-400 font-medium">{selectedEsp}</span>
-                <span className="text-xs text-zinc-600">({displayList.length})</span>
-              </div>
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => {
+                setSearch(e.target.value);
+                if (e.target.value.trim()) setSelectedCirurgia(null);
+              }}
+              placeholder="Buscar cirurgia ou problema... (ex: vasoplegia)"
+              className="w-full bg-white/5 border border-white/8 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-white/20 transition-colors"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
             )}
-            {search.trim() && (
-              <p className="text-xs text-zinc-500">
-                {searchResults.length} resultado{searchResults.length !== 1 ? 's' : ''} para "{search}"
-              </p>
-            )}
+          </div>
 
-            <div className="space-y-2">
-              {displayList.map(c => (
-                <div key={c.nome}>
-                  <SurgeryRow
-                    cirurgia={c}
-                    selected={selectedCirurgia?.nome === c.nome}
-                    onSelect={() => handleSelectCirurgia(c)}
-                  />
-                  <AnimatePresence>
-                    {selectedCirurgia?.nome === c.nome && (
-                      <motion.div
-                        key="ficha"
-                        ref={fichaRef}
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mt-2 overflow-hidden"
-                      >
-                        <FichaCirurgica
-                          cirurgia={selectedCirurgia}
-                          onClose={() => setSelectedCirurgia(null)}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+          {/* Specialty grid — hide when searching */}
+          <AnimatePresence>
+            {!search.trim() && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-3">Especialidade</p>
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                  {ESPECIALIDADES.map(esp => (
+                    <SpecialtyCard
+                      key={esp}
+                      name={esp}
+                      count={countByEsp[esp] ?? 0}
+                      active={selectedEsp === esp}
+                      onSelect={() => handleSelectEsp(esp)}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-      {/* Empty state */}
-      {search.trim() && searchResults.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center py-12 text-zinc-600"
-        >
-          <Search className="w-8 h-8 mx-auto mb-3 opacity-40" />
-          <p className="text-sm">Nenhuma cirurgia encontrada para "{search}"</p>
-        </motion.div>
-      )}
+          {/* Surgery list */}
+          <AnimatePresence mode="wait">
+            {displayList.length > 0 && (
+              <motion.div
+                key={search + (selectedEsp ?? '')}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="space-y-3"
+              >
+                {/* Back button when specialty is selected */}
+                {selectedEsp && !search.trim() && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { setSelectedEsp(null); setSelectedCirurgia(null); }}
+                      className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      Voltar
+                    </button>
+                    <span className="text-xs text-zinc-600">·</span>
+                    <span className="text-xs text-zinc-400 font-medium">{selectedEsp}</span>
+                    <span className="text-xs text-zinc-600">({displayList.length})</span>
+                  </div>
+                )}
+                {search.trim() && (
+                  <p className="text-xs text-zinc-500">
+                    {searchResults.length} resultado{searchResults.length !== 1 ? 's' : ''} para "{search}"
+                  </p>
+                )}
 
-      {/* Initial prompt */}
-      {!search.trim() && !selectedEsp && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center py-8 text-zinc-600"
-        >
-          <p className="text-sm">Selecione uma especialidade acima</p>
-          <p className="text-xs mt-1">ou use a busca para encontrar qualquer cirurgia</p>
-        </motion.div>
+                <div className="space-y-2">
+                  {displayList.map(c => (
+                    <div key={c.nome}>
+                      <SurgeryRow
+                        cirurgia={c}
+                        selected={selectedCirurgia?.nome === c.nome}
+                        onSelect={() => handleSelectCirurgia(c)}
+                      />
+                      <AnimatePresence>
+                        {selectedCirurgia?.nome === c.nome && (
+                          <motion.div
+                            key="ficha"
+                            ref={fichaRef}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="mt-2 overflow-hidden"
+                          >
+                            <FichaCirurgica
+                              cirurgia={selectedCirurgia}
+                              onClose={() => setSelectedCirurgia(null)}
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Empty state */}
+          {search.trim() && searchResults.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center py-12 text-zinc-600"
+            >
+              <Search className="w-8 h-8 mx-auto mb-3 opacity-40" />
+              <p className="text-sm">Nenhuma cirurgia encontrada para "{search}"</p>
+            </motion.div>
+          )}
+
+          {/* Initial prompt */}
+          {!search.trim() && !selectedEsp && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center py-8 text-zinc-600"
+            >
+              <p className="text-sm">Selecione uma especialidade acima</p>
+              <p className="text-xs mt-1">ou use a busca para encontrar qualquer cirurgia</p>
+            </motion.div>
+          )}
+        </>
       )}
     </div>
   );

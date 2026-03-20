@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { Activity, Pill, ClipboardCheck, History, UserRound, Heart, Scissors } from 'lucide-react';
+import { Activity, Pill, ClipboardCheck, History, UserRound, Heart, BookOpen } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'motion/react';
 import { ConsentBanner } from './ConsentBanner';
@@ -14,7 +14,7 @@ export function Layout() {
 
   const navItems = [
     { to: '/pre-anestesica', icon: ClipboardCheck, label: 'Avaliação' },
-    { to: '/cirurgias', icon: Scissors, label: 'Cirurgias' },
+    { to: '/guias', icon: BookOpen, label: 'Guias' },
     { to: '/gasometria', icon: Activity, label: t('common.gasometry') },
     { to: '/hemodinamica', icon: Heart, label: 'Hemo' },
     { to: '/drogas', icon: Pill, label: t('common.drugs') },
