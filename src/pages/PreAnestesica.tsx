@@ -57,6 +57,100 @@ function CheckboxRow({ label, checked, onChange }: CheckboxRowProps) {
   );
 }
 
+// ── Yes/No Toggle ─────────────────────────────────────────────────────────────
+
+interface YesNoToggleProps {
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+}
+
+function YesNoToggle({ label, value, onChange }: YesNoToggleProps) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2 px-3 rounded-xl border border-slate-800 bg-slate-800/20">
+      <span className="text-sm text-slate-300 flex-1">{label}</span>
+      <div className="flex gap-1 flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => onChange(true)}
+          className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+            value
+              ? 'bg-rose-500/25 text-rose-300 border border-rose-500/40'
+              : 'bg-slate-800 text-slate-500 border border-slate-700 hover:text-slate-300'
+          }`}
+        >
+          Sim
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(false)}
+          className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+            !value
+              ? 'bg-slate-700 text-slate-200 border border-slate-600'
+              : 'bg-slate-800 text-slate-500 border border-slate-700 hover:text-slate-300'
+          }`}
+        >
+          Não
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Accordion Section ────────────────────────────────────────────────────────
+
+interface AccordionSectionProps {
+  id: string;
+  title: string;
+  accentColor?: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  hasData?: boolean;
+  children: React.ReactNode;
+}
+
+function AccordionSection({ title, accentColor = 'blue', isOpen, onToggle, hasData, children }: AccordionSectionProps) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-800/40 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          {hasData && (
+            <span className={`w-2 h-2 rounded-full bg-${accentColor}-400 flex-shrink-0`} />
+          )}
+          <span className={`text-sm font-semibold ${hasData ? `text-${accentColor}-300` : 'text-slate-300'}`}>
+            {title}
+          </span>
+        </div>
+        {isOpen ? (
+          <ChevronUp className="w-4 h-4 text-slate-500 flex-shrink-0" />
+        ) : (
+          <ChevronDown className="w-4 h-4 text-slate-500 flex-shrink-0" />
+        )}
+      </button>
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            key="content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 pt-1 space-y-2 border-t border-slate-800">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function PreAnestesica() {
@@ -122,6 +216,53 @@ export function PreAnestesica() {
   const [fichaAlergias, setFichaAlergias] = useState('');
   const [fichaAiSuggestion, setFichaAiSuggestion] = useState<string | null>(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+
+  // ── Sinais Vitais ──────────────────────────────────────────────────────────
+  const [fichaPAS, setFichaPAS] = useState<number | ''>('');
+  const [fichaPAD, setFichaPAD] = useState<number | ''>('');
+  const [fichaFC, setFichaFC] = useState<number | ''>('');
+
+  // ── Medicações em uso (texto livre) ───────────────────────────────────────
+  const [medicacoesEmUso, setMedicacoesEmUso] = useState('');
+
+  // ── Histórico Clínico ──────────────────────────────────────────────────────
+  const [openSection, setOpenSection] = useState<string | null>(null);
+  const toggleSection = (id: string) => setOpenSection(prev => prev === id ? null : id);
+
+  const [neuro, setNeuro] = useState({ convulsao: false, avc: false, neuropatia: false, hic: false });
+  const [neuroDesc, setNeuroDesc] = useState('');
+
+  const [cardioHx, setCardioHx] = useState({ hipertensao: false, coronariopatia: false, valvulopatia: false, icc: false, arritmia: false });
+  const [cardioECG, setCardioECG] = useState('');
+  const [cardioRxTorax, setCardioRxTorax] = useState('');
+  const [cardioEco, setCardioEco] = useState('');
+  const [cardioDesc, setCardioDesc] = useState('');
+
+  const [resp, setResp] = useState({ dpoc: false, ivas: false, intubacaoDificil: false });
+  const [respDesc, setRespDesc] = useState('');
+
+  const [hemato, setHemato] = useState({ anemia: false, leucose: false, coagulopatia: false });
+  const [labHemato, setLabHemato] = useState({ hb: '', htc: '', plaquetas: '', ap: '', ttpa: '', gb: '' });
+
+  const [infeccao, setInfeccao] = useState({ hiv: false, hepatite: false });
+  const [infeccaoDesc, setInfeccaoDesc] = useState('');
+
+  const [renal, setRenal] = useState({ insufRenal: false, desidratacao: false, altEletrolitica: false });
+  const [labRenal, setLabRenal] = useState({ ureia: '', creatinina: '', na: '', k: '', ca: '', mg: '' });
+
+  const [endocrino, setEndocrino] = useState({ dm1: false, dm2: false, hipertireoidismo: false, hipotireoidismo: false, dlp: false });
+  const [labEndocrino, setLabEndocrino] = useState({ glicemia: '', hba1c: '', tsh: '', t4: '' });
+
+  const [osteo, setOsteo] = useState({ artrite: false, viciosPostura: false, disfAtm: false, herniaDiscal: false });
+  const [osteoDesc, setOsteoDesc] = useState('');
+
+  const [digestivo, setDigestivo] = useState({ estomaCheio: false, desnutricao: false, disfHepatica: false, obesidade: false });
+
+  const [habitos, setHabitos] = useState('');
+  const [complicAnestFamiliar, setComplicAnestFamiliar] = useState('');
+  const [cirurgiasAnteriores, setCirurgiasAnteriores] = useState('');
+  const [quimioterapia, setQuimioterapia] = useState(false);
+  const [radioterapia, setRadioterapia] = useState(false);
 
   // ── TAB 3 STATE (Medicações) ───────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -223,19 +364,102 @@ export function PreAnestesica() {
     setFichaAiSuggestion(null);
     try {
       const dados: DadosFichaAnestesica = {
+        // Biometria
         idade: fichaIdade ? Number(fichaIdade) : undefined,
         peso: fichaPeso ? Number(fichaPeso) : undefined,
         altura: fichaAltura ? Number(fichaAltura) : undefined,
         imc: fichaBMI ?? undefined,
+        // Sinais vitais
+        paSistolica: fichaPAS ? Number(fichaPAS) : undefined,
+        paDiastolica: fichaPAD ? Number(fichaPAD) : undefined,
+        frequenciaCardiaca: fichaFC ? Number(fichaFC) : undefined,
+        // Classificação
         asaClass: asa.id,
         emergencia: fichaEmergencia,
+        // Via aérea
         mallampatiClass: mallampati.id,
         ulbt: fichaULBT,
         lemonScore: lemonScore,
         obeseScore: obeseScore,
+        // Cardiovascular / funcional
         rcriScore: resGoldman.score,
         mets: fichaMETs === 'alto' ? 5 : 3,
         ariscatScore: fichaARISCAT ? Number(fichaARISCAT) : undefined,
+        // Histórico cardiovascular
+        hx_hipertensao: cardioHx.hipertensao,
+        hx_coronariopatia: cardioHx.coronariopatia,
+        hx_valvulopatia: cardioHx.valvulopatia,
+        hx_icc: cardioHx.icc,
+        hx_arritmia: cardioHx.arritmia,
+        hx_cardio_descricao: cardioDesc || undefined,
+        ecg: cardioECG || undefined,
+        rxTorax: cardioRxTorax || undefined,
+        ecocardiograma: cardioEco || undefined,
+        // Neurológico
+        hx_convulsao: neuro.convulsao,
+        hx_avc: neuro.avc,
+        hx_neuropatia: neuro.neuropatia,
+        hx_hic: neuro.hic,
+        hx_neuro_descricao: neuroDesc || undefined,
+        // Respiratório
+        hx_dpoc: resp.dpoc,
+        hx_ivas: resp.ivas,
+        hx_intubacaoDificil: resp.intubacaoDificil,
+        hx_resp_descricao: respDesc || undefined,
+        // Hematológico
+        hx_anemia: hemato.anemia,
+        hx_leucose: hemato.leucose,
+        hx_coagulopatia: hemato.coagulopatia,
+        lab_hb: labHemato.hb ? Number(labHemato.hb) : undefined,
+        lab_htc: labHemato.htc ? Number(labHemato.htc) : undefined,
+        lab_plaquetas: labHemato.plaquetas ? Number(labHemato.plaquetas) : undefined,
+        lab_ap: labHemato.ap ? Number(labHemato.ap) : undefined,
+        lab_ttpa: labHemato.ttpa ? Number(labHemato.ttpa) : undefined,
+        lab_gb: labHemato.gb ? Number(labHemato.gb) : undefined,
+        // Infecção
+        hx_hiv: infeccao.hiv,
+        hx_hepatite: infeccao.hepatite,
+        hx_infeccao_descricao: infeccaoDesc || undefined,
+        // Renal / Metabólico
+        hx_insuficienciaRenal: renal.insufRenal,
+        hx_desidratacao: renal.desidratacao,
+        hx_alteracaoEletrolitica: renal.altEletrolitica,
+        lab_ureia: labRenal.ureia ? Number(labRenal.ureia) : undefined,
+        lab_creatinina: labRenal.creatinina ? Number(labRenal.creatinina) : undefined,
+        lab_na: labRenal.na ? Number(labRenal.na) : undefined,
+        lab_k: labRenal.k ? Number(labRenal.k) : undefined,
+        lab_ca: labRenal.ca ? Number(labRenal.ca) : undefined,
+        lab_mg: labRenal.mg ? Number(labRenal.mg) : undefined,
+        // Endócrino
+        hx_dm1: endocrino.dm1,
+        hx_dm2: endocrino.dm2,
+        hx_hipertireoidismo: endocrino.hipertireoidismo,
+        hx_hipotireoidismo: endocrino.hipotireoidismo,
+        hx_dlp: endocrino.dlp,
+        lab_glicemia: labEndocrino.glicemia ? Number(labEndocrino.glicemia) : undefined,
+        lab_hba1c: labEndocrino.hba1c ? Number(labEndocrino.hba1c) : undefined,
+        lab_tsh: labEndocrino.tsh ? Number(labEndocrino.tsh) : undefined,
+        lab_t4: labEndocrino.t4 ? Number(labEndocrino.t4) : undefined,
+        // Osteomuscular
+        hx_artrite: osteo.artrite,
+        hx_viciosPostura: osteo.viciosPostura,
+        hx_disfAtm: osteo.disfAtm,
+        hx_herniaDiscal: osteo.herniaDiscal,
+        hx_osteo_descricao: osteoDesc || undefined,
+        // Digestivo
+        hx_estomaCheio: digestivo.estomaCheio,
+        hx_desnutricao: digestivo.desnutricao,
+        hx_disfHepatica: digestivo.disfHepatica,
+        hx_obesidade: digestivo.obesidade,
+        // Antecedentes
+        alergias: fichaAlergias || undefined,
+        habitos: habitos || undefined,
+        complicAnestFamiliar: complicAnestFamiliar || undefined,
+        cirurgiasAnteriores: cirurgiasAnteriores || undefined,
+        quimioterapia: quimioterapia || undefined,
+        radioterapia: radioterapia || undefined,
+        // Medicações
+        medicacoesEmUso: medicacoesEmUso || undefined,
       };
       const result = await gerarFichaAnestesica(dados);
       setFichaAiSuggestion(result);
@@ -390,12 +614,69 @@ export function PreAnestesica() {
                   </span>
                 </div>
               )}
+              {/* Sinais Vitais */}
+              <div className="grid grid-cols-3 gap-4">
+                <Input
+                  label="PA Sistólica (mmHg)"
+                  type="number"
+                  min={0}
+                  placeholder="Ex: 120"
+                  value={fichaPAS}
+                  onChange={(e) => setFichaPAS(e.target.value === '' ? '' : Number(e.target.value))}
+                />
+                <Input
+                  label="PA Diastólica (mmHg)"
+                  type="number"
+                  min={0}
+                  placeholder="Ex: 80"
+                  value={fichaPAD}
+                  onChange={(e) => setFichaPAD(e.target.value === '' ? '' : Number(e.target.value))}
+                />
+                <Input
+                  label="FC (bpm)"
+                  type="number"
+                  min={0}
+                  placeholder="Ex: 72"
+                  value={fichaFC}
+                  onChange={(e) => setFichaFC(e.target.value === '' ? '' : Number(e.target.value))}
+                />
+              </div>
+              {fichaPAS !== '' && fichaPAD !== '' && (
+                <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-800 bg-slate-900">
+                  <span className="text-xs text-slate-400 uppercase tracking-wider">PAM calculada:</span>
+                  <span className="font-bold font-mono text-white">
+                    {((Number(fichaPAS) + 2 * Number(fichaPAD)) / 3).toFixed(0)} mmHg
+                  </span>
+                  {Number(fichaPAS) > 140 || Number(fichaPAD) > 90 ? (
+                    <span className="text-xs text-amber-400">(Hipertensão)</span>
+                  ) : null}
+                </div>
+              )}
               <Input
                 label="Alergias conhecidas"
                 type="text"
                 placeholder="Ex: Penicilina, Látex, AINH"
                 value={fichaAlergias}
                 onChange={(e) => setFichaAlergias(e.target.value)}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Medicações em uso */}
+          <Card className="border-slate-800 bg-slate-900/50">
+            <CardHeader>
+              <CardTitle className="text-slate-300 flex items-center gap-2 text-base">
+                <Pill className="w-4 h-4 text-amber-400" />
+                Medicações em uso
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <textarea
+                placeholder="Liste as medicações em uso (uma por linha ou separadas por vírgula)&#10;Ex: AAS 100mg, Losartana 50mg, Atenolol 50mg 2x/dia, Atorvastatina 80mg..."
+                value={medicacoesEmUso}
+                onChange={(e) => setMedicacoesEmUso(e.target.value)}
+                rows={4}
+                className="w-full px-4 py-3 rounded-xl border border-slate-700 bg-slate-800/50 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-slate-500 focus:bg-slate-800 transition-all resize-none"
               />
             </CardContent>
           </Card>
@@ -845,6 +1126,202 @@ export function PreAnestesica() {
             </CardContent>
           </Card>
 
+          {/* Histórico Clínico — Accordion Sections */}
+          <div className="space-y-1">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest px-1 pb-1">Histórico Clínico</p>
+
+            {/* Neurológico */}
+            <AccordionSection
+              id="neuro"
+              title="Neurológico"
+              accentColor="purple"
+              isOpen={openSection === 'neuro'}
+              onToggle={() => toggleSection('neuro')}
+              hasData={neuro.convulsao || neuro.avc || neuro.neuropatia || neuro.hic || !!neuroDesc}
+            >
+              <YesNoToggle label="Síndrome convulsiva" value={neuro.convulsao} onChange={v => setNeuro({ ...neuro, convulsao: v })} />
+              <YesNoToggle label="Doença vascular cerebral / AVC" value={neuro.avc} onChange={v => setNeuro({ ...neuro, avc: v })} />
+              <YesNoToggle label="Neuropatia periférica" value={neuro.neuropatia} onChange={v => setNeuro({ ...neuro, neuropatia: v })} />
+              <YesNoToggle label="Hipertensão intracraniana" value={neuro.hic} onChange={v => setNeuro({ ...neuro, hic: v })} />
+              <Input label="Descrição / Exames" type="text" placeholder="Exames, achados relevantes..." value={neuroDesc} onChange={e => setNeuroDesc(e.target.value)} />
+            </AccordionSection>
+
+            {/* Cardiovascular */}
+            <AccordionSection
+              id="cardioHx"
+              title="Cardiovascular — Histórico"
+              accentColor="rose"
+              isOpen={openSection === 'cardioHx'}
+              onToggle={() => toggleSection('cardioHx')}
+              hasData={cardioHx.hipertensao || cardioHx.coronariopatia || cardioHx.valvulopatia || cardioHx.icc || cardioHx.arritmia || !!cardioECG || !!cardioRxTorax || !!cardioEco}
+            >
+              <YesNoToggle label="Hipertensão arterial" value={cardioHx.hipertensao} onChange={v => setCardioHx({ ...cardioHx, hipertensao: v })} />
+              <YesNoToggle label="Insuficiência coronariana / DAC" value={cardioHx.coronariopatia} onChange={v => setCardioHx({ ...cardioHx, coronariopatia: v })} />
+              <YesNoToggle label="Valvulopatia" value={cardioHx.valvulopatia} onChange={v => setCardioHx({ ...cardioHx, valvulopatia: v })} />
+              <YesNoToggle label="Insuficiência cardíaca congestiva (ICC)" value={cardioHx.icc} onChange={v => setCardioHx({ ...cardioHx, icc: v })} />
+              <YesNoToggle label="Arritmia cardíaca" value={cardioHx.arritmia} onChange={v => setCardioHx({ ...cardioHx, arritmia: v })} />
+              <p className="text-xs text-slate-500 uppercase tracking-wider pt-2">Exames</p>
+              <Input label="ECG" type="text" placeholder="Ex: Ritmo sinusal, sem alterações" value={cardioECG} onChange={e => setCardioECG(e.target.value)} />
+              <Input label="RX Tórax" type="text" placeholder="Ex: ICT preservado, sem congestão" value={cardioRxTorax} onChange={e => setCardioRxTorax(e.target.value)} />
+              <Input label="Ecocardiograma" type="text" placeholder="Ex: FE 0,66 — normal" value={cardioEco} onChange={e => setCardioEco(e.target.value)} />
+              <Input label="Descrição / Outros" type="text" placeholder="Observações clínicas..." value={cardioDesc} onChange={e => setCardioDesc(e.target.value)} />
+            </AccordionSection>
+
+            {/* Respiratório */}
+            <AccordionSection
+              id="resp"
+              title="Respiratório"
+              accentColor="sky"
+              isOpen={openSection === 'resp'}
+              onToggle={() => toggleSection('resp')}
+              hasData={resp.dpoc || resp.ivas || resp.intubacaoDificil || !!respDesc}
+            >
+              <YesNoToggle label="Doença pulmonar obstrutiva/restritiva (DPOC)" value={resp.dpoc} onChange={v => setResp({ ...resp, dpoc: v })} />
+              <YesNoToggle label="IVAS recente (infecção via aérea superior)" value={resp.ivas} onChange={v => setResp({ ...resp, ivas: v })} />
+              <YesNoToggle label="Histórico de intubação difícil" value={resp.intubacaoDificil} onChange={v => setResp({ ...resp, intubacaoDificil: v })} />
+              <Input label="Descrição / Exames" type="text" placeholder="RX tórax, espirometria, outros..." value={respDesc} onChange={e => setRespDesc(e.target.value)} />
+            </AccordionSection>
+
+            {/* Hematológico */}
+            <AccordionSection
+              id="hemato"
+              title="Hematológico"
+              accentColor="red"
+              isOpen={openSection === 'hemato'}
+              onToggle={() => toggleSection('hemato')}
+              hasData={hemato.anemia || hemato.leucose || hemato.coagulopatia || Object.values(labHemato).some(v => !!v)}
+            >
+              <YesNoToggle label="Anemia" value={hemato.anemia} onChange={v => setHemato({ ...hemato, anemia: v })} />
+              <YesNoToggle label="Leucose" value={hemato.leucose} onChange={v => setHemato({ ...hemato, leucose: v })} />
+              <YesNoToggle label="Coagulopatia" value={hemato.coagulopatia} onChange={v => setHemato({ ...hemato, coagulopatia: v })} />
+              <p className="text-xs text-slate-500 uppercase tracking-wider pt-2">Exames laboratoriais</p>
+              <div className="grid grid-cols-3 gap-3">
+                <Input label="Hb (g/dL)" type="number" placeholder="Ex: 14,9" value={labHemato.hb} onChange={e => setLabHemato({ ...labHemato, hb: e.target.value })} />
+                <Input label="Htc (%)" type="number" placeholder="Ex: 41,9" value={labHemato.htc} onChange={e => setLabHemato({ ...labHemato, htc: e.target.value })} />
+                <Input label="Plaquetas" type="number" placeholder="Ex: 159000" value={labHemato.plaquetas} onChange={e => setLabHemato({ ...labHemato, plaquetas: e.target.value })} />
+                <Input label="AP (%)" type="number" placeholder="Ex: 1,06" value={labHemato.ap} onChange={e => setLabHemato({ ...labHemato, ap: e.target.value })} />
+                <Input label="TTPA" type="number" placeholder="Ex: 0,72" value={labHemato.ttpa} onChange={e => setLabHemato({ ...labHemato, ttpa: e.target.value })} />
+                <Input label="GB (/mm³)" type="number" placeholder="Ex: 5320" value={labHemato.gb} onChange={e => setLabHemato({ ...labHemato, gb: e.target.value })} />
+              </div>
+            </AccordionSection>
+
+            {/* Infecção */}
+            <AccordionSection
+              id="infeccao"
+              title="Infecção"
+              accentColor="orange"
+              isOpen={openSection === 'infeccao'}
+              onToggle={() => toggleSection('infeccao')}
+              hasData={infeccao.hiv || infeccao.hepatite || !!infeccaoDesc}
+            >
+              <YesNoToggle label="HIV" value={infeccao.hiv} onChange={v => setInfeccao({ ...infeccao, hiv: v })} />
+              <YesNoToggle label="Hepatite" value={infeccao.hepatite} onChange={v => setInfeccao({ ...infeccao, hepatite: v })} />
+              <Input label="Qual / Descrição" type="text" placeholder="Tipo, status, carga viral..." value={infeccaoDesc} onChange={e => setInfeccaoDesc(e.target.value)} />
+            </AccordionSection>
+
+            {/* Renal / Metabólico */}
+            <AccordionSection
+              id="renal"
+              title="Renal / Metabólico"
+              accentColor="teal"
+              isOpen={openSection === 'renal'}
+              onToggle={() => toggleSection('renal')}
+              hasData={renal.insufRenal || renal.desidratacao || renal.altEletrolitica || Object.values(labRenal).some(v => !!v)}
+            >
+              <YesNoToggle label="Insuficiência renal" value={renal.insufRenal} onChange={v => setRenal({ ...renal, insufRenal: v })} />
+              <YesNoToggle label="Desidratação" value={renal.desidratacao} onChange={v => setRenal({ ...renal, desidratacao: v })} />
+              <YesNoToggle label="Alteração eletrolítica" value={renal.altEletrolitica} onChange={v => setRenal({ ...renal, altEletrolitica: v })} />
+              <p className="text-xs text-slate-500 uppercase tracking-wider pt-2">Exames laboratoriais</p>
+              <div className="grid grid-cols-3 gap-3">
+                <Input label="Ureia" type="number" placeholder="Ex: 40" value={labRenal.ureia} onChange={e => setLabRenal({ ...labRenal, ureia: e.target.value })} />
+                <Input label="Creatinina (mg/dL)" type="number" placeholder="Ex: 1,13" value={labRenal.creatinina} onChange={e => setLabRenal({ ...labRenal, creatinina: e.target.value })} />
+                <Input label="Na (mEq/L)" type="number" placeholder="Ex: 139" value={labRenal.na} onChange={e => setLabRenal({ ...labRenal, na: e.target.value })} />
+                <Input label="K (mEq/L)" type="number" placeholder="Ex: 4,6" value={labRenal.k} onChange={e => setLabRenal({ ...labRenal, k: e.target.value })} />
+                <Input label="Ca" type="number" placeholder="Ex: 1,13" value={labRenal.ca} onChange={e => setLabRenal({ ...labRenal, ca: e.target.value })} />
+                <Input label="Mg" type="number" placeholder="Ex: 1,8" value={labRenal.mg} onChange={e => setLabRenal({ ...labRenal, mg: e.target.value })} />
+              </div>
+            </AccordionSection>
+
+            {/* Endócrino */}
+            <AccordionSection
+              id="endocrino"
+              title="Endócrino"
+              accentColor="yellow"
+              isOpen={openSection === 'endocrino'}
+              onToggle={() => toggleSection('endocrino')}
+              hasData={endocrino.dm1 || endocrino.dm2 || endocrino.hipertireoidismo || endocrino.hipotireoidismo || endocrino.dlp || Object.values(labEndocrino).some(v => !!v)}
+            >
+              <YesNoToggle label="Diabetes Mellitus tipo 1" value={endocrino.dm1} onChange={v => setEndocrino({ ...endocrino, dm1: v })} />
+              <YesNoToggle label="Diabetes Mellitus tipo 2" value={endocrino.dm2} onChange={v => setEndocrino({ ...endocrino, dm2: v })} />
+              <YesNoToggle label="Hipertireoidismo" value={endocrino.hipertireoidismo} onChange={v => setEndocrino({ ...endocrino, hipertireoidismo: v })} />
+              <YesNoToggle label="Hipotireoidismo" value={endocrino.hipotireoidismo} onChange={v => setEndocrino({ ...endocrino, hipotireoidismo: v })} />
+              <YesNoToggle label="Dislipidemia (DLP)" value={endocrino.dlp} onChange={v => setEndocrino({ ...endocrino, dlp: v })} />
+              <p className="text-xs text-slate-500 uppercase tracking-wider pt-2">Exames laboratoriais</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="Glicemia de jejum (mg/dL)" type="number" placeholder="Ex: 88" value={labEndocrino.glicemia} onChange={e => setLabEndocrino({ ...labEndocrino, glicemia: e.target.value })} />
+                <Input label="HbA1c (%)" type="number" placeholder="Ex: 5,7" value={labEndocrino.hba1c} onChange={e => setLabEndocrino({ ...labEndocrino, hba1c: e.target.value })} />
+                <Input label="TSH" type="number" placeholder="Ex: 2,5" value={labEndocrino.tsh} onChange={e => setLabEndocrino({ ...labEndocrino, tsh: e.target.value })} />
+                <Input label="T4 Livre" type="number" placeholder="Ex: 1,11" value={labEndocrino.t4} onChange={e => setLabEndocrino({ ...labEndocrino, t4: e.target.value })} />
+              </div>
+            </AccordionSection>
+
+            {/* Osteomuscular */}
+            <AccordionSection
+              id="osteo"
+              title="Osteomuscular"
+              accentColor="amber"
+              isOpen={openSection === 'osteo'}
+              onToggle={() => toggleSection('osteo')}
+              hasData={osteo.artrite || osteo.viciosPostura || osteo.disfAtm || osteo.herniaDiscal || !!osteoDesc}
+            >
+              <YesNoToggle label="Artrite reumatoide" value={osteo.artrite} onChange={v => setOsteo({ ...osteo, artrite: v })} />
+              <YesNoToggle label="Vícios de postura" value={osteo.viciosPostura} onChange={v => setOsteo({ ...osteo, viciosPostura: v })} />
+              <YesNoToggle label="Disfunção ATM (temporomandibular)" value={osteo.disfAtm} onChange={v => setOsteo({ ...osteo, disfAtm: v })} />
+              <YesNoToggle label="Hérnia discal" value={osteo.herniaDiscal} onChange={v => setOsteo({ ...osteo, herniaDiscal: v })} />
+              <Input label="Descrição" type="text" placeholder="Observações relevantes..." value={osteoDesc} onChange={e => setOsteoDesc(e.target.value)} />
+            </AccordionSection>
+
+            {/* Digestivo / Nutricional */}
+            <AccordionSection
+              id="digestivo"
+              title="Digestivo / Nutricional"
+              accentColor="green"
+              isOpen={openSection === 'digestivo'}
+              onToggle={() => toggleSection('digestivo')}
+              hasData={digestivo.estomaCheio || digestivo.desnutricao || digestivo.disfHepatica || digestivo.obesidade}
+            >
+              <YesNoToggle label="Risco de estômago cheio / aspiração" value={digestivo.estomaCheio} onChange={v => setDigestivo({ ...digestivo, estomaCheio: v })} />
+              <YesNoToggle label="Desnutrição" value={digestivo.desnutricao} onChange={v => setDigestivo({ ...digestivo, desnutricao: v })} />
+              <YesNoToggle label="Disfunção hepática" value={digestivo.disfHepatica} onChange={v => setDigestivo({ ...digestivo, disfHepatica: v })} />
+              <YesNoToggle label="Obesidade" value={digestivo.obesidade} onChange={v => setDigestivo({ ...digestivo, obesidade: v })} />
+            </AccordionSection>
+
+            {/* Antecedentes */}
+            <AccordionSection
+              id="antecedentes"
+              title="Antecedentes"
+              accentColor="slate"
+              isOpen={openSection === 'antecedentes'}
+              onToggle={() => toggleSection('antecedentes')}
+              hasData={!!habitos || !!complicAnestFamiliar || !!cirurgiasAnteriores || quimioterapia || radioterapia}
+            >
+              <Input label="Hábitos e vícios (tabagismo, etilismo, drogas)" type="text" placeholder="Ex: Ex-tabagista 20 anos, etilismo social" value={habitos} onChange={e => setHabitos(e.target.value)} />
+              <YesNoToggle label="Quimioterapia prévia" value={quimioterapia} onChange={v => setQuimioterapia(v)} />
+              <YesNoToggle label="Radioterapia prévia" value={radioterapia} onChange={v => setRadioterapia(v)} />
+              <Input label="Complicações anestésicas familiares" type="text" placeholder="Ex: Hipertermia maligna na família" value={complicAnestFamiliar} onChange={e => setComplicAnestFamiliar(e.target.value)} />
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Cirurgias anteriores</label>
+                <textarea
+                  placeholder="Ex: Angioplastia, Hemorroidectomia, Biópsia próstata — nega intercorrências anestésicas"
+                  value={cirurgiasAnteriores}
+                  onChange={(e) => setCirurgiasAnteriores(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-700 bg-slate-800/50 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-slate-500 focus:bg-slate-800 transition-all resize-none"
+                />
+              </div>
+            </AccordionSection>
+          </div>
+
           {/* Risk Summary Panel */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
             <Card className="border-emerald-500/30 bg-emerald-950/20">
@@ -940,17 +1417,17 @@ export function PreAnestesica() {
             </Card>
           </motion.div>
 
-          {/* AI Synthesis */}
-          <Card className="border-slate-800 bg-slate-900/50">
+          {/* AI Final Considerations */}
+          <Card className="border-violet-500/20 bg-violet-950/10">
             <CardHeader>
               <CardTitle className="text-violet-400 flex items-center gap-2">
                 <Sparkles className="w-5 h-5" />
-                Síntese com IA
+                Considerações Finais com IA
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-slate-400">
-                Gere uma análise SBAR executiva baseada nos dados da ficha para briefing pré-indução.
+                Gera recomendações clínicas específicas e acionáveis com base em todos os dados da ficha — incluindo manejo de medicações, profilaxia TVP, estratégia de via aérea e monitorização.
               </p>
               <Button
                 onClick={handleGerarFicha}
@@ -966,7 +1443,7 @@ export function PreAnestesica() {
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Gerar Síntese com IA
+                    Gerar Considerações Finais com IA
                   </>
                 )}
               </Button>

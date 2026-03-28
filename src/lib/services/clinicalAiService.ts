@@ -466,6 +466,11 @@ export interface DadosFichaAnestesica {
   altura?: number;
   imc?: number;
 
+  // Sinais Vitais
+  paSistolica?: number;
+  paDiastolica?: number;
+  frequenciaCardiaca?: number;
+
   // Classificação
   asaClass?: string; // 'I' | 'II' | 'III' | 'IV' | 'V' | 'VI'
   emergencia?: boolean;
@@ -481,58 +486,305 @@ export interface DadosFichaAnestesica {
   mets?: number;
   ariscatScore?: number; // 0-100
 
-  // Outros
+  // Outros scores
   stopBangScore?: number; // 0-8
   apfelScore?: number; // 0-4
+
+  // Histórico Cardiovascular
+  hx_hipertensao?: boolean;
+  hx_coronariopatia?: boolean;
+  hx_valvulopatia?: boolean;
+  hx_icc?: boolean;
+  hx_arritmia?: boolean;
+  hx_cardio_descricao?: string;
+  ecg?: string;
+  rxTorax?: string;
+  ecocardiograma?: string;
+
+  // Histórico Neurológico
+  hx_convulsao?: boolean;
+  hx_avc?: boolean;
+  hx_neuropatia?: boolean;
+  hx_hic?: boolean;
+  hx_neuro_descricao?: string;
+
+  // Histórico Respiratório
+  hx_dpoc?: boolean;
+  hx_ivas?: boolean;
+  hx_intubacaoDificil?: boolean;
+  hx_resp_descricao?: string;
+
+  // Histórico Hematológico
+  hx_anemia?: boolean;
+  hx_leucose?: boolean;
+  hx_coagulopatia?: boolean;
+  lab_hb?: number;
+  lab_htc?: number;
+  lab_plaquetas?: number;
+  lab_ap?: number;
+  lab_ttpa?: number;
+  lab_gb?: number;
+
+  // Infecção
+  hx_hiv?: boolean;
+  hx_hepatite?: boolean;
+  hx_infeccao_descricao?: string;
+
+  // Renal / Metabólico
+  hx_insuficienciaRenal?: boolean;
+  hx_desidratacao?: boolean;
+  hx_alteracaoEletrolitica?: boolean;
+  lab_ureia?: number;
+  lab_creatinina?: number;
+  lab_na?: number;
+  lab_k?: number;
+  lab_ca?: number;
+  lab_mg?: number;
+
+  // Endócrino
+  hx_dm1?: boolean;
+  hx_dm2?: boolean;
+  hx_hipertireoidismo?: boolean;
+  hx_hipotireoidismo?: boolean;
+  hx_dlp?: boolean;
+  lab_glicemia?: number;
+  lab_hba1c?: number;
+  lab_tsh?: number;
+  lab_t4?: number;
+
+  // Osteomuscular
+  hx_artrite?: boolean;
+  hx_viciosPostura?: boolean;
+  hx_disfAtm?: boolean;
+  hx_herniaDiscal?: boolean;
+  hx_osteo_descricao?: string;
+
+  // Digestivo / Nutricional
+  hx_estomaCheio?: boolean;
+  hx_desnutricao?: boolean;
+  hx_disfHepatica?: boolean;
+  hx_obesidade?: boolean;
+
+  // Antecedentes
+  alergias?: string;
+  habitos?: string;
+  complicAnestFamiliar?: string;
+  cirurgiasAnteriores?: string;
+  quimioterapia?: boolean;
+  radioterapia?: boolean;
+
+  // Medicações em uso
+  medicacoesEmUso?: string;
 }
 
 export async function gerarFichaAnestesica(dados: DadosFichaAnestesica): Promise<string> {
-  const linhas: string[] = [];
+  // ── Biometria e Sinais Vitais ────────────────────────────────
+  const biometria: string[] = [];
+  if (dados.idade != null) biometria.push(`• Idade: ${dados.idade} anos`);
+  if (dados.peso != null && dados.altura != null) biometria.push(`• Peso: ${dados.peso} kg | Altura: ${dados.altura} cm`);
+  if (dados.imc != null) biometria.push(`• IMC: ${dados.imc.toFixed(1)} kg/m²`);
+  if (dados.asaClass) biometria.push(`• Classificação ASA: ${dados.asaClass}${dados.emergencia ? 'E (emergência)' : ''}`);
 
-  if (dados.idade != null) linhas.push(`• Idade: ${dados.idade} anos`);
-  if (dados.peso != null && dados.altura != null) linhas.push(`• Peso: ${dados.peso} kg | Altura: ${dados.altura} cm`);
-  if (dados.imc != null) linhas.push(`• IMC: ${dados.imc.toFixed(1)} kg/m²`);
-  if (dados.asaClass) linhas.push(`• Classificação ASA: ${dados.asaClass}${dados.emergencia ? 'E (emergência)' : ''}`);
-  if (dados.mallampatiClass) linhas.push(`• Mallampati: Classe ${dados.mallampatiClass}`);
-  if (dados.ulbt != null) linhas.push(`• ULBT (Teste Mordida Lábio): ${dados.ulbt}/3`);
-  if (dados.lemonScore != null) linhas.push(`• LEMON Score: ${dados.lemonScore}/5`);
-  if (dados.obeseScore != null) linhas.push(`• Critérios OBESE (ventilação difícil): ${dados.obeseScore}/5`);
-  if (dados.rcriScore != null) linhas.push(`• RCRI (Lee): ${dados.rcriScore}/6`);
-  if (dados.mets != null) linhas.push(`• Capacidade Funcional: ${dados.mets} METs`);
-  if (dados.ariscatScore != null) linhas.push(`• ARISCAT (risco pulmonar): ${dados.ariscatScore}`);
-  if (dados.stopBangScore != null) linhas.push(`• STOP-BANG (SAOS): ${dados.stopBangScore}/8`);
-  if (dados.apfelScore != null) linhas.push(`• Apfel (NVPO): ${dados.apfelScore}/4`);
+  const sinaisVitais: string[] = [];
+  if (dados.paSistolica != null && dados.paDiastolica != null) {
+    const pam = ((dados.paSistolica + 2 * dados.paDiastolica) / 3).toFixed(0);
+    sinaisVitais.push(`• PA: ${dados.paSistolica}/${dados.paDiastolica} mmHg (PAM ~${pam})`);
+  }
+  if (dados.frequenciaCardiaca != null) sinaisVitais.push(`• FC: ${dados.frequenciaCardiaca} bpm`);
 
-  const prompt = `Você é um Anestesiologista Sênior realizando avaliação pré-anestésica de rotina.
+  // ── Histórico Cardiovascular ─────────────────────────────────
+  const cardio: string[] = [];
+  if (dados.hx_hipertensao) cardio.push('Hipertensão arterial');
+  if (dados.hx_coronariopatia) cardio.push('Doença coronariana / insuficiência coronariana');
+  if (dados.hx_valvulopatia) cardio.push('Valvulopatia');
+  if (dados.hx_icc) cardio.push('Insuficiência cardíaca congestiva (ICC)');
+  if (dados.hx_arritmia) cardio.push('Arritmia cardíaca');
+  const examesCardio: string[] = [];
+  if (dados.ecg) examesCardio.push(`ECG: ${dados.ecg}`);
+  if (dados.rxTorax) examesCardio.push(`RX Tórax: ${dados.rxTorax}`);
+  if (dados.ecocardiograma) examesCardio.push(`Ecocardiograma: ${dados.ecocardiograma}`);
 
-DADOS DO PACIENTE:
-${linhas.join('\n')}
+  // ── Histórico Neurológico ────────────────────────────────────
+  const neuro: string[] = [];
+  if (dados.hx_convulsao) neuro.push('Síndrome convulsiva');
+  if (dados.hx_avc) neuro.push('Doença vascular cerebral / AVC');
+  if (dados.hx_neuropatia) neuro.push('Neuropatia periférica');
+  if (dados.hx_hic) neuro.push('Hipertensão intracraniana');
 
-TAREFA: Gere uma síntese SBAR executiva e focada para briefing pré-indução.
+  // ── Histórico Respiratório ───────────────────────────────────
+  const resp: string[] = [];
+  if (dados.hx_dpoc) resp.push('Doença pulmonar obstrutiva/restritiva (DPOC)');
+  if (dados.hx_ivas) resp.push('IVAS recente');
+  if (dados.hx_intubacaoDificil) resp.push('Histórico de intubação difícil');
 
-INSTRUÇÕES DE SAÍDA (Markdown, máximo 350 palavras, sem introduções genéricas):
+  // ── Histórico Hematológico ───────────────────────────────────
+  const hemato: string[] = [];
+  if (dados.hx_anemia) hemato.push('Anemia');
+  if (dados.hx_leucose) hemato.push('Leucose');
+  if (dados.hx_coagulopatia) hemato.push('Coagulopatia');
+  const labsHemato: string[] = [];
+  if (dados.lab_hb != null) labsHemato.push(`Hb ${dados.lab_hb} g/dL`);
+  if (dados.lab_htc != null) labsHemato.push(`Htc ${dados.lab_htc}%`);
+  if (dados.lab_plaquetas != null) labsHemato.push(`Plq ${dados.lab_plaquetas.toLocaleString('pt-BR')}/mm³`);
+  if (dados.lab_ap != null) labsHemato.push(`AP ${dados.lab_ap}%`);
+  if (dados.lab_ttpa != null) labsHemato.push(`TTPA ${dados.lab_ttpa}`);
+  if (dados.lab_gb != null) labsHemato.push(`GB ${dados.lab_gb}/mm³`);
 
-## Situação e Background
-Resumo biométrico e estado físico do paciente (1-2 linhas).
+  // ── Infecção ─────────────────────────────────────────────────
+  const infec: string[] = [];
+  if (dados.hx_hiv) infec.push('HIV positivo');
+  if (dados.hx_hepatite) infec.push('Hepatite');
 
-## Via Aérea
-Classifique a dificuldade de intubação e ventilação baseado nos scores fornecidos. Indique estratégia recomendada (Mallampati/LEMON ≥3: videolaringoscópio como 1ª escolha; OBESE ≥2: planejar máscara difícil).
+  // ── Renal / Metabólico ───────────────────────────────────────
+  const renal: string[] = [];
+  if (dados.hx_insuficienciaRenal) renal.push('Insuficiência renal');
+  if (dados.hx_desidratacao) renal.push('Desidratação');
+  if (dados.hx_alteracaoEletrolitica) renal.push('Alteração eletrolítica');
+  const labsRenal: string[] = [];
+  if (dados.lab_ureia != null) labsRenal.push(`Ureia ${dados.lab_ureia}`);
+  if (dados.lab_creatinina != null) labsRenal.push(`Creat ${dados.lab_creatinina} mg/dL`);
+  if (dados.lab_na != null) labsRenal.push(`Na ${dados.lab_na} mEq/L`);
+  if (dados.lab_k != null) labsRenal.push(`K ${dados.lab_k} mEq/L`);
+  if (dados.lab_ca != null) labsRenal.push(`Ca ${dados.lab_ca}`);
+  if (dados.lab_mg != null) labsRenal.push(`Mg ${dados.lab_mg}`);
 
-## Risco Cardiovascular e Pulmonar
-Interprete RCRI + METs + ARISCAT. Indique se monitorização invasiva (PAI) é recomendada ou se exames adicionais são necessários.
+  // ── Endócrino ────────────────────────────────────────────────
+  const endoc: string[] = [];
+  if (dados.hx_dm1) endoc.push('Diabetes Mellitus tipo 1');
+  if (dados.hx_dm2) endoc.push('Diabetes Mellitus tipo 2');
+  if (dados.hx_hipertireoidismo) endoc.push('Hipertireoidismo');
+  if (dados.hx_hipotireoidismo) endoc.push('Hipotireoidismo');
+  if (dados.hx_dlp) endoc.push('Dislipidemia (DLP)');
+  const labsEndoc: string[] = [];
+  if (dados.lab_glicemia != null) labsEndoc.push(`Glicemia ${dados.lab_glicemia} mg/dL`);
+  if (dados.lab_hba1c != null) labsEndoc.push(`HbA1c ${dados.lab_hba1c}%`);
+  if (dados.lab_tsh != null) labsEndoc.push(`TSH ${dados.lab_tsh}`);
+  if (dados.lab_t4 != null) labsEndoc.push(`T4L ${dados.lab_t4}`);
+
+  // ── Osteomuscular ────────────────────────────────────────────
+  const osteo: string[] = [];
+  if (dados.hx_artrite) osteo.push('Artrite reumatoide');
+  if (dados.hx_viciosPostura) osteo.push('Vícios de postura');
+  if (dados.hx_disfAtm) osteo.push('Disfunção ATM');
+  if (dados.hx_herniaDiscal) osteo.push('Hérnia discal');
+
+  // ── Digestivo ────────────────────────────────────────────────
+  const digest: string[] = [];
+  if (dados.hx_estomaCheio) digest.push('Risco de estômago cheio / aspiração');
+  if (dados.hx_desnutricao) digest.push('Desnutrição');
+  if (dados.hx_disfHepatica) digest.push('Disfunção hepática');
+  if (dados.hx_obesidade) digest.push('Obesidade');
+
+  // ── Construção do bloco de dados ─────────────────────────────
+  const blocos: string[] = [];
+  if (biometria.length) blocos.push(`BIOMETRIA E CLASSIFICAÇÃO:\n${biometria.join('\n')}`);
+  if (sinaisVitais.length) blocos.push(`SINAIS VITAIS:\n${sinaisVitais.join('\n')}`);
+
+  if (cardio.length || examesCardio.length || dados.hx_cardio_descricao) {
+    const c = [`HISTÓRICO CARDIOVASCULAR:`];
+    if (cardio.length) c.push(`• Comorbidades: ${cardio.join(', ')}`);
+    if (examesCardio.length) c.push(examesCardio.map(e => `• ${e}`).join('\n'));
+    if (dados.hx_cardio_descricao) c.push(`• Descrição: ${dados.hx_cardio_descricao}`);
+    blocos.push(c.join('\n'));
+  }
+  if (neuro.length || dados.hx_neuro_descricao) {
+    const n = [`HISTÓRICO NEUROLÓGICO:`];
+    if (neuro.length) n.push(`• ${neuro.join(', ')}`);
+    if (dados.hx_neuro_descricao) n.push(`• ${dados.hx_neuro_descricao}`);
+    blocos.push(n.join('\n'));
+  }
+  if (resp.length || dados.hx_resp_descricao) {
+    const r = [`HISTÓRICO RESPIRATÓRIO:`];
+    if (resp.length) r.push(`• ${resp.join(', ')}`);
+    if (dados.hx_resp_descricao) r.push(`• ${dados.hx_resp_descricao}`);
+    blocos.push(r.join('\n'));
+  }
+  if (hemato.length || labsHemato.length) {
+    const h = [`HISTÓRICO HEMATOLÓGICO:`];
+    if (hemato.length) h.push(`• ${hemato.join(', ')}`);
+    if (labsHemato.length) h.push(`• Labs: ${labsHemato.join(' | ')}`);
+    blocos.push(h.join('\n'));
+  }
+  if (infec.length || dados.hx_infeccao_descricao) {
+    blocos.push(`INFECÇÃO:\n• ${[...infec, dados.hx_infeccao_descricao].filter(Boolean).join(', ')}`);
+  }
+  if (renal.length || labsRenal.length) {
+    const rn = [`HISTÓRICO RENAL/METABÓLICO:`];
+    if (renal.length) rn.push(`• ${renal.join(', ')}`);
+    if (labsRenal.length) rn.push(`• Labs: ${labsRenal.join(' | ')}`);
+    blocos.push(rn.join('\n'));
+  }
+  if (endoc.length || labsEndoc.length) {
+    const en = [`HISTÓRICO ENDÓCRINO:`];
+    if (endoc.length) en.push(`• ${endoc.join(', ')}`);
+    if (labsEndoc.length) en.push(`• Labs: ${labsEndoc.join(' | ')}`);
+    blocos.push(en.join('\n'));
+  }
+  if (osteo.length || dados.hx_osteo_descricao) {
+    const os = [`HISTÓRICO OSTEOMUSCULAR:`];
+    if (osteo.length) os.push(`• ${osteo.join(', ')}`);
+    if (dados.hx_osteo_descricao) os.push(`• ${dados.hx_osteo_descricao}`);
+    blocos.push(os.join('\n'));
+  }
+  if (digest.length) {
+    blocos.push(`DIGESTIVO/NUTRICIONAL:\n• ${digest.join(', ')}`);
+  }
+  if (dados.alergias) blocos.push(`ALERGIAS: ${dados.alergias}`);
+  if (dados.habitos) blocos.push(`HÁBITOS/VÍCIOS: ${dados.habitos}`);
+  if (dados.cirurgiasAnteriores) blocos.push(`CIRURGIAS ANTERIORES: ${dados.cirurgiasAnteriores}`);
+  if (dados.complicAnestFamiliar) blocos.push(`COMPLICAÇÕES ANESTÉSICAS FAMILIARES: ${dados.complicAnestFamiliar}`);
+  if (dados.quimioterapia) blocos.push(`QUIMIOTERAPIA: Sim`);
+  if (dados.radioterapia) blocos.push(`RADIOTERAPIA: Sim`);
+  if (dados.medicacoesEmUso) blocos.push(`MEDICAÇÕES EM USO:\n${dados.medicacoesEmUso}`);
+
+  // ── Scores ───────────────────────────────────────────────────
+  const scores: string[] = [];
+  if (dados.mallampatiClass) scores.push(`Mallampati: Classe ${dados.mallampatiClass}`);
+  if (dados.ulbt != null) scores.push(`ULBT: ${dados.ulbt}/3`);
+  if (dados.lemonScore != null) scores.push(`LEMON: ${dados.lemonScore}/5`);
+  if (dados.obeseScore != null) scores.push(`OBESE (ventilação difícil): ${dados.obeseScore}/5`);
+  if (dados.rcriScore != null) scores.push(`RCRI (Lee): ${dados.rcriScore}/6`);
+  if (dados.mets != null) scores.push(`Capacidade Funcional: ${dados.mets} METs`);
+  if (dados.ariscatScore != null) scores.push(`ARISCAT: ${dados.ariscatScore}`);
+  if (dados.stopBangScore != null) scores.push(`STOP-BANG (SAOS): ${dados.stopBangScore}/8`);
+  if (dados.apfelScore != null) scores.push(`Apfel (NVPO): ${dados.apfelScore}/4`);
+
+  const prompt = `Você é um Anestesiologista Sênior realizando avaliação pré-anestésica detalhada.
+
+${blocos.join('\n\n')}
+
+SCORES DE RISCO:
+${scores.length ? scores.map(s => `• ${s}`).join('\n') : '• Não informados'}
+
+TAREFA: Gere avaliação pré-anestésica estruturada com foco em considerações clínicas práticas.
+
+INSTRUÇÕES DE SAÍDA (Markdown, máximo 500 palavras, sem introduções genéricas):
+
+## Avaliação por Sistemas
+Parágrafo breve por sistema com achado clinicamente relevante. Omitir sistemas sem dados anormais.
+
+## Via Aérea — Estratégia
+Decisão clara: rotina / videolaringoscópio 1ª escolha / broncoscopia acordado.
+Justificativa objetiva nos scores e histórico fornecidos.
+
+## Risco Anestésico-Cirúrgico
+Síntese RCRI + METs + ARISCAT + ASA. Indicação de monitorização invasiva (PAI, PVC) se aplicável.
 
 ## Alertas Críticos
-Liste em bullets apenas alertas que requerem ação concreta (omitir se não houver):
-- Via aérea difícil → equipamentos necessários
-- Risco cardíaco elevado → conduta específica
-- Risco pulmonar → ventilação protetora
-- Emergência/estômago cheio → ISR
-- Obesidade mórbida → posicionamento, pré-oxigenação
+Bullets — apenas itens que exigem ação concreta antes/durante cirurgia. Omitir se ausentes.
 
-## Recomendação Final
-1 frase de síntese: "Este paciente [perfil resumido] — atenção especial para [X e Y]."
+## Considerações Finais — Recomendações Específicas
+Lista de bullets com verbos imperativos, ESPECÍFICOS para ESTE paciente com base nos dados fornecidos:
+- Para cada medicação relevante em uso: "Suspender [medicação] [N] dias antes" ou "Manter [medicação] — não suspender"
+- Profilaxia TVP: mecânica (meias de compressão) e/ou farmacológica (HBPM) conforme risco
+- Estratégia de via aérea com equipamentos
+- Manejo glicêmico intraop (se DM presente)
+- Protocolo de jejum / restrição hídrica se aplicável
+- Posicionamento especial (se obesidade, osteomuscular)
+- Monitorização adicional indicada
+- Outras medidas específicas derivadas dos dados (ex: ISR se estômago cheio, antibioticoprofilaxia, etc.)
 
-Seja direto, clínico e praticamente útil para um anestesista na sala de indução.`;
+Seja direto, clínico e praticamente útil para um anestesista preparando a indução.`;
 
   try {
     return await callAI(prompt, 'gemini-3.1-pro-preview');
